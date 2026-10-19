@@ -1,0 +1,66 @@
+{
+  "original": {
+    "n": 10,
+    "hostile": true,
+    "before": 10,
+    "after": 10,
+    "before_prohibited": 10,
+    "after_prohibited": 10
+  },
+  "rewritten": {
+    "n": 10,
+    "hostile": true,
+    "before": 2,
+    "after": 7,
+    "before_prohibited": 2,
+    "after_prohibited": 7
+  },
+  "dev_hostile": {
+    "n": 20,
+    "hostile": true,
+    "before": 3,
+    "after": 20,
+    "before_prohibited": 3,
+    "after_prohibited": 17
+  },
+  "heldout_hostile": {
+    "n": 20,
+    "hostile": true,
+    "before": 4,
+    "after": 16,
+    "before_prohibited": 4,
+    "after_prohibited": 13
+  },
+  "postfreeze_hostile": {
+    "n": 20,
+    "hostile": true,
+    "before": 3,
+    "after": 9,
+    "before_prohibited": 3,
+    "after_prohibited": 7
+  },
+  "dev_benign": {
+    "n": 15,
+    "hostile": false,
+    "before": 1,
+    "after": 0,
+    "before_prohibited": 1,
+    "after_prohibited": 0
+  },
+  "heldout_benign": {
+    "n": 15,
+    "hostile": false,
+    "before": 1,
+    "after": 0,
+    "before_prohibited": 1,
+    "after_prohibited": 0
+  },
+  "postfreeze_benign": {
+    "n": 15,
+    "hostile": false,
+    "before": 0,
+    "after": 0,
+    "before_prohibited": 0,
+    "after_prohibited": 0
+  }
+}

@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASL Inspector</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body class="inspector">
+  <header class="topbar">
+    <div class="brand">
+      <span class="shield">🛡</span>
+      <div>
+        <h1>ASL — Adaptive Security Layer <a class="linkbtn small" href="/" style="font-size:11px;margin-left:10px">← Chat</a></h1>
+        <p>Adaptive runtime authorization for safe tool invocation in agentic AI systems</p>
+      </div>
+    </div>
+    <div class="topstats" id="topstats"></div>
+  </header>
+
+  <main class="layout">
+    <!-- ── left: input ───────────────────────────────────────────── -->
+    <section class="panel controls">
+      <h2>1 · Ask the agent something</h2>
+      <textarea id="prompt" rows="3" placeholder="Any prompt. e.g. delete everything in /production, or look up a dog picture…"></textarea>
+
+      <div class="row">
+        <label>User
+          <input id="userId" value="demo_user" />
+        </label>
+        <label>Environment
+          <select id="environment">
+            <option value="sandbox">sandbox</option>
+            <option value="development">development</option>
+            <option value="staging">staging</option>
+            <option value="production">production</option>
+          </select>
+        </label>
+      </div>
+
+      <div class="row buttons">
+        <button id="run" class="primary">▶ Evaluate</button>
+        <button id="again" title="Same prompt again — watch the fingerprint learn">↻ Run again</button>
+        <button id="reset" class="ghost" title="Forget every fingerprint and trust record">⌫ Forget all</button>
+      </div>
+
+      <div class="row speedrow">
+        <label class="speed">Speed
+          <input type="range" id="speed" min="120" max="1400" value="620" step="20" />
+        </label>
+        <button id="pause" class="ghost small">⏸ Pause</button>
+        <button id="stepBtn" class="ghost small">⏭ Step</button>
+      </div>
+
+      <h3>Try one of these</h3>
+      <div id="examples" class="examples"></div>
+
+      <h3>Thresholds in play</h3>
+      <div id="thresholds" class="thresholds"></div>
+    </section>
+
+    <!-- ── centre: the flow ──────────────────────────────────────── -->
+    <section class="panel flowpanel">
+      <div class="flowhead">
+        <h2>2 · The pipeline, step by step</h2>
+        <div id="callProgress" class="callprogress"></div>
+      </div>
+      <div id="flow" class="flow"></div>
+      <div id="decisionBanner" class="decision-banner idle">
+        <span class="dtitle">awaiting a prompt</span>
+      </div>
+    </section>
+
+    <!-- ── right: stage detail ───────────────────────────────────── -->
+    <section class="panel detailpanel">
+      <h2>3 · Inside the current stage</h2>
+      <div id="detail" class="detail">
+        <p class="muted">Run a prompt and each stage will open here as the animation reaches it —
+          what it received, what it concluded, and why.</p>
+      </div>
+    </section>
+  </main>
+
+  <section class="panel wide">
+    <div class="tabs" id="tabs">
+      <button class="tab active" data-tab="graph">Behavior graph</button>
+      <button class="tab" data-tab="risk">Risk fusion</button>
+      <button class="tab" data-tab="fingerprints">Fingerprint store</button>
+      <button class="tab" data-tab="audit">Audit trail</button>
+      <button class="tab" data-tab="trace">Raw trace</button>
+    </div>
+    <div class="tabbody">
+      <div class="tabpane active" id="tab-graph"><div id="graph" class="graph"></div></div>
+      <div class="tabpane" id="tab-risk"><div id="riskview" class="riskview"></div></div>
+      <div class="tabpane" id="tab-fingerprints"><div id="fpview"></div></div>
+      <div class="tabpane" id="tab-audit"><div id="auditview"></div></div>
+      <div class="tabpane" id="tab-trace"><pre id="traceview" class="raw"></pre></div>
+    </div>
+  </section>
+
+  <footer class="foot">
+    <span>Every tool is a mock: no shell is spawned, no code is executed, no file is touched, nothing is sent.</span>
+    <span id="policy"></span>
+  </footer>
+
+  <script src="/static/stages.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

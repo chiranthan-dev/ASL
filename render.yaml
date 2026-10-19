@@ -1,0 +1,16 @@
+# One-click deploy to Render (https://render.com).
+# New > Blueprint > connect this repository. Render reads this file and
+# provisions a free web service. The public demo runs the deterministic mock
+# planner; no API key or model server is required.
+services:
+  - type: web
+    name: asl-adaptive-security-layer
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.6"

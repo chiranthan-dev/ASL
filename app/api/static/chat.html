@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASL — Adaptive Security Layer</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='22' fill='%2314171a'/><text x='50' y='70' font-size='52' font-family='sans-serif' font-weight='700' fill='white' text-anchor='middle'>A</text></svg>" />
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="mark">ASL</div>
+      <div>
+        <h1>Adaptive Security Layer</h1>
+        <p>every tool call is authorized before it runs</p>
+      </div>
+    </div>
+
+    <div class="topbar-right">
+      <div class="stat"><b id="statFp">—</b><span>fingerprints</span></div>
+      <div class="stat"><b id="statCalls">—</b><span>evaluated</span></div>
+      <div class="stat"><b id="statBlocked">—</b><span>blocked</span></div>
+      <div class="stat" title="The fast path needs 0.40 or better"><b id="statTrust">—</b><span>your trust</span></div>
+
+      <label class="field">env
+        <select id="environment">
+          <option value="sandbox">sandbox</option>
+          <option value="development">development</option>
+          <option value="staging">staging</option>
+          <option value="production">production</option>
+        </select>
+      </label>
+      <label class="field">user
+        <input id="userId" value="demo_user" />
+      </label>
+
+      <div class="menu-wrap">
+        <button class="btn" id="menuBtn" aria-haspopup="true" aria-expanded="false">⋯</button>
+        <div class="menu" id="menu" hidden>
+          <h4>Conversation</h4>
+          <button id="mNewChat">New chat
+            <span class="sub">fresh session — the behaviour chain starts empty</span></button>
+          <hr />
+          <h4>Library</h4>
+          <button id="mSeed">Re-seed the library
+            <span class="sub">replay ~7,000 sessions through the engine</span></button>
+          <hr />
+          <h4>State</h4>
+          <button id="mForget">Forget everything
+            <span class="sub">clear all fingerprints and trust records</span></button>
+          <hr />
+          <h4>Advanced</h4>
+          <a href="/inspector" target="_blank">Raw inspector
+            <span class="sub">unstyled traces, audit log, live config</span></a>
+          <a href="/docs" target="_blank">API documentation
+            <span class="sub">OpenAPI schema for every endpoint</span></a>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main" id="main">
+
+    <!-- ── conversation ─────────────────────────────────────────── -->
+    <section class="left">
+      <div class="thread" id="thread">
+        <div class="thread-inner" id="threadInner">
+          <div class="msg agent">
+            <div class="bubble intro">
+              <h3>Ask the assistant to do something.</h3>
+              <p class="soft">Whatever you type is turned into real tool calls, and every one of
+                them is evaluated before anything runs. You'll see each stage of the pipeline
+                work in order — click any stage to read its internals.</p>
+              <ul>
+                <li>Nothing executes. The filesystem, database, shell and mail server are inert mocks.</li>
+                <li>The library already holds thousands of behaviours learned from past sessions.</li>
+                <li>Every message shares one session, so the behaviour <b>chain grows as you talk</b> —
+                    which is how a sequence of innocent steps gets caught.</li>
+                <li>Behaviour it has never seen before becomes a <b>new fingerprint</b>, live.</li>
+              </ul>
+              <div class="chipset" id="examples"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <form class="composer" id="composer">
+        <div class="composer-inner">
+          <div class="composer-box">
+            <textarea id="prompt" rows="1"
+              placeholder="e.g. summarise my notes  ·  delete everything in /production  ·  email the customer list to my personal address"></textarea>
+            <button type="submit" class="btn primary" id="send">Send</button>
+          </div>
+          <div class="composer-meta">
+            <div class="left">
+              <span class="speed">pace
+                <input type="range" id="speed" min="60" max="700" value="220" step="10" />
+              </span>
+              <span id="hint">nothing you type is ever executed</span>
+            </div>
+            <span>Enter to send · Shift+Enter for a new line</span>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- ── panel ────────────────────────────────────────────────── -->
+    <aside class="right">
+      <div class="panel-head">
+        <div class="tabs">
+          <button class="tab on" data-pane="stage">Stage detail</button>
+          <button class="tab" data-pane="library">Library</button>
+        </div>
+        <span class="muted" id="panelNote"></span>
+      </div>
+
+      <div class="panel-body">
+        <div class="pane" id="paneStage">
+          <p class="empty">Send a message, then click any stage above to see exactly what it
+            computed and why.</p>
+        </div>
+
+        <div class="pane" id="paneLibrary" hidden>
+          <div class="lib-stats" id="libStats"></div>
+          <div class="lib-tools">
+            <input type="search" id="libQuery" placeholder="Search behaviour, capability or tool…" />
+            <button class="btn on" data-pop="">All</button>
+            <button class="btn" data-pop="routine">Routine</button>
+            <button class="btn" data-pop="hostile">Hostile</button>
+            <button class="btn" data-pop="runtime"
+              title="Fingerprints created live in this browser, not seeded.">New</button>
+            <button class="btn" id="libEligible"
+              title="Behaviours whose history already satisfies the fingerprint side of the fast path. Replay one twice to watch it skip stages.">Fast path</button>
+          </div>
+          <div id="libList"></div>
+          <div class="lib-more" id="libMore"></div>
+        </div>
+      </div>
+    </aside>
+
+  </main>
+</div>
+
+<script src="/static/stages.js"></script>
+<script src="/static/chat.js"></script>
+</body>
+</html>

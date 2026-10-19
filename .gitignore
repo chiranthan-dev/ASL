@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Runtime database (regenerated on first run from asl_state.seeded.db)
+asl_state.db
+asl_state.db-shm
+asl_state.db-wal
+
+# Evaluation working artifacts
+evaluation/results/_mutation_work/
+
+# Editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Claude Code local config
+.claude/

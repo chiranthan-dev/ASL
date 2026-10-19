@@ -1,0 +1,187 @@
+{
+  "generated_at": "2026-10-07T23:39:00",
+  "seed": 20260909,
+  "harmful_scenarios": 110,
+  "strategies": [
+    "identity",
+    "rename",
+    "namespace",
+    "opaque",
+    "disguise"
+  ],
+  "results": [
+    {
+      "strategy": "disguise",
+      "system": "asl_full",
+      "recall": 0.9273,
+      "block_rate": 0.5,
+      "detected": 102,
+      "total": 110,
+      "mean_risk": 77.04
+    },
+    {
+      "strategy": "disguise",
+      "system": "static_rules",
+      "recall": 0.2818,
+      "block_rate": 0.2818,
+      "detected": 31,
+      "total": 110,
+      "mean_risk": 0.0
+    },
+    {
+      "strategy": "identity",
+      "system": "asl_full",
+      "recall": 0.9091,
+      "block_rate": 0.7,
+      "detected": 100,
+      "total": 110,
+      "mean_risk": 80.97
+    },
+    {
+      "strategy": "identity",
+      "system": "static_rules",
+      "recall": 0.8364,
+      "block_rate": 0.6091,
+      "detected": 92,
+      "total": 110,
+      "mean_risk": 0.0
+    },
+    {
+      "strategy": "namespace",
+      "system": "asl_full",
+      "recall": 0.9727,
+      "block_rate": 0.7,
+      "detected": 107,
+      "total": 110,
+      "mean_risk": 81.05
+    },
+    {
+      "strategy": "namespace",
+      "system": "static_rules",
+      "recall": 0.2818,
+      "block_rate": 0.2818,
+      "detected": 31,
+      "total": 110,
+      "mean_risk": 0.0
+    },
+    {
+      "strategy": "opaque",
+      "system": "asl_full",
+      "recall": 0.9273,
+      "block_rate": 0.5,
+      "detected": 102,
+      "total": 110,
+      "mean_risk": 76.99
+    },
+    {
+      "strategy": "opaque",
+      "system": "static_rules",
+      "recall": 0.2818,
+      "block_rate": 0.2818,
+      "detected": 31,
+      "total": 110,
+      "mean_risk": 0.0
+    },
+    {
+      "strategy": "rename",
+      "system": "asl_full",
+      "recall": 0.9727,
+      "block_rate": 0.5909,
+      "detected": 107,
+      "total": 110,
+      "mean_risk": 78.11
+    },
+    {
+      "strategy": "rename",
+      "system": "static_rules",
+      "recall": 0.2818,
+      "block_rate": 0.2818,
+      "detected": 31,
+      "total": 110,
+      "mean_risk": 0.0
+    }
+  ],
+  "fingerprint_continuity": {
+    "disguise": 0.8636,
+    "namespace": 1.0,
+    "opaque": 0.7545,
+    "rename": 0.8818
+  },
+  "benign_false_positive_rate": {
+    "identity": {
+      "n": 89,
+      "asl_full": 0.0449,
+      "static_rules": 0.1461
+    },
+    "rename": {
+      "n": 89,
+      "asl_full": 0.1573,
+      "static_rules": 0.0
+    },
+    "namespace": {
+      "n": 89,
+      "asl_full": 0.1573,
+      "static_rules": 0.0
+    },
+    "opaque": {
+      "n": 89,
+      "asl_full": 0.1461,
+      "static_rules": 0.0
+    },
+    "disguise": {
+      "n": 89,
+      "asl_full": 0.1461,
+      "static_rules": 0.0
+    }
+  },
+  "continuity_by_verb_location": [
+    {
+      "strategy": "disguise",
+      "verb_location": "verb_in_name",
+      "continuity": 0.7,
+      "n": 50
+    },
+    {
+      "strategy": "disguise",
+      "verb_location": "verb_in_payload",
+      "continuity": 1.0,
+      "n": 60
+    },
+    {
+      "strategy": "namespace",
+      "verb_location": "verb_in_name",
+      "continuity": 1.0,
+      "n": 50
+    },
+    {
+      "strategy": "namespace",
+      "verb_location": "verb_in_payload",
+      "continuity": 1.0,
+      "n": 60
+    },
+    {
+      "strategy": "opaque",
+      "verb_location": "verb_in_name",
+      "continuity": 0.46,
+      "n": 50
+    },
+    {
+      "strategy": "opaque",
+      "verb_location": "verb_in_payload",
+      "continuity": 1.0,
+      "n": 60
+    },
+    {
+      "strategy": "rename",
+      "verb_location": "verb_in_name",
+      "continuity": 0.74,
+      "n": 50
+    },
+    {
+      "strategy": "rename",
+      "verb_location": "verb_in_payload",
+      "continuity": 1.0,
+      "n": 60
+    }
+  ]
+}
