@@ -120,6 +120,30 @@ or via environment variables: `ASL_MOCK_LLM=false`, `ASL_LLM_MODEL`, `ASL_LLM_BA
 
 ---
 
+## Deploy
+
+The repository is deploy-ready. The public demo runs the deterministic mock planner,
+so no API key or model server is needed in the cloud.
+
+**Render** (free tier, one click) — the repo includes [`render.yaml`](render.yaml). On
+[render.com](https://render.com): **New → Blueprint**, connect this repository, and
+Render provisions the service automatically. Health check: `/health`.
+
+**Docker** (anywhere):
+
+```bash
+docker build -t asl .
+```
+
+```bash
+docker run -p 8000:8000 asl
+```
+
+**Any Procfile host** (Railway, Fly, Heroku-likes) — start command:
+`uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
+
+---
+
 ## How it works
 
 Per intercepted call ASL runs a pipeline of 21 stages:
