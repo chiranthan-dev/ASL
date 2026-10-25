@@ -22,8 +22,8 @@ from app.models.context import AnalysisContext
 
 @dataclass
 class ConfidenceEstimate:
-    confidence: float                  # 0-1: how well we believe we understood the call
-    risk_contribution: float           # 0-100: what that uncertainty costs
+    confidence: float
+    risk_contribution: float
     explanation: str = ""
     source: str = "mock"
     detail: dict = field(default_factory=dict)
@@ -69,8 +69,6 @@ class MockLLMConfidenceEstimator(ConfidenceEstimator):
             confidence *= value
         confidence = round(min(0.98, max(0.05, confidence ** 0.6)), 3)
 
-        # Uncertainty costs risk: at confidence 1.0 it adds nothing, at 0.2 it
-        # adds a lot. It never *reduces* risk.
         risk_contribution = round(min(100.0, (1.0 - confidence) * 85.0), 2)
 
         return ConfidenceEstimate(
@@ -141,7 +139,7 @@ class OpenAICompatibleConfidenceEstimator(ConfidenceEstimator):
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
             parsed: dict[str, Any] = json.loads(content)
-        except Exception as exc:  # noqa: BLE001 - any failure must degrade, not crash
+        except Exception as exc:
             estimate = self._fallback.estimate(context)
             estimate.explanation += f" (LLM estimator unavailable: {type(exc).__name__})"
             estimate.source = "mock-fallback"

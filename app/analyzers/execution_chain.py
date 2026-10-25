@@ -18,35 +18,19 @@ from dataclasses import dataclass
 from app.models.context import AnalysisContext
 from app.models.enums import Capability, ResourceClass, Scope
 
-#: Patterns whose severity depends on whether the data actually leaves the
-#: organisation. Mailing a colleague after reading a file is ordinary work;
-#: mailing the same file to an outside address is the event that matters.
 BOUNDARY_SENSITIVE = {"EXFILTRATION_VIA_MAIL", "READ_THEN_UPLOAD", "EXFILTRATION"}
 
-#: Resource classes that sit outside the trust boundary.
 OUTSIDE = {ResourceClass.EMAIL_RECIPIENT_EXTERNAL, ResourceClass.EXTERNAL_ENDPOINT}
 
-#: What an outward pattern scores when the destination is demonstrably internal
-#: *and* nothing sensitive has been read. Not zero: reading and then sending is
-#: still worth recording, and the argument analyzer keeps its own view of the
-#: payload.
 CONTAINED_RISK = 35.0
 
-#: Residual risk carried by a session in which a dangerous pattern already
-#: completed. Enough that the session is not treated as clean, far below the
-#: pattern's own severity, which was charged at the time it fired.
 PRIOR_PATTERN_FLOOR = 30.0
 
-#: Resource classes whose contents do not become routine just because they are
-#: staying inside the organisation. An internal recipient bounds where data can
-#: travel; it does not declassify what is travelling.
 SENSITIVE_SOURCES = {
     ResourceClass.CREDENTIAL_STORE, ResourceClass.PRODUCTION_RESOURCE,
     ResourceClass.SENSITIVE_TABLE, ResourceClass.SYSTEM_PATH,
 }
 
-#: Ordered capability patterns and what they mean. Matched as *subsequences*
-#: (gaps allowed), because an attacker rarely runs the steps back to back.
 CHAIN_PATTERNS: tuple[tuple[str, tuple[Capability, ...], float, str], ...] = (
     ("STAGED_INTRUSION",
      (Capability.DOWNLOAD, Capability.EXECUTE, Capability.DELETE), 97.0,
@@ -100,10 +84,7 @@ class ExecutionChainAnalyzer:
         }
 
         matched: list[str] = []
-        #: dangerous patterns that completed earlier in this session
         prior: list[str] = []
-        # A single step is not a chain: with nothing to relate it to, this
-        # analyzer has almost nothing to say and should not inflate the mean.
         risk = 15.0 if len(sequence) > 1 else 8.0
         explanations: list[str] = []
 
@@ -113,18 +94,12 @@ class ExecutionChainAnalyzer:
         for name, pattern, pattern_risk, description in CHAIN_PATTERNS:
             if not self._is_subsequence(pattern, flat):
                 continue
-            # The pattern exists in the session's history. Does it *close here*?
-            # If its final capability is not one this call exercises, the chain
-            # completed on an earlier turn, was scored then, and must not be
-            # charged again to an unrelated action.
             if pattern[-1] not in current:
                 if pattern_risk >= 80.0:
                     prior.append(name)
                 continue
             matched.append(name)
             if name in BOUNDARY_SENSITIVE and not crosses and not sensitive_payload:
-                # The sequence is there, but the destination is inside the
-                # organisation. Report it, do not treat it as exfiltration.
                 explanations.append(
                     f"{' -> '.join(c.value for c in pattern)}: {description}"
                     " (destination is internal, so not treated as exfiltration)")
@@ -136,17 +111,12 @@ class ExecutionChainAnalyzer:
         detail["sensitive_payload"] = sensitive_payload
         detail["prior_patterns"] = prior
 
-        # A session that has already attempted something serious is not pristine,
-        # but the attempt was scored when it happened. What remains is a modest
-        # floor, not the original severity.
         if prior:
             risk = max(risk, PRIOR_PATTERN_FLOOR)
             explanations.append(
                 f"earlier in this session: {', '.join(sorted(set(prior)))} "
                 "(already scored when it occurred)")
 
-        # A chain that only ever matched the benign pattern should not inherit
-        # its 25 as a floor if it is a single harmless step.
         if matched == ["BENIGN_PROCESSING"] and len(sequence) == 1:
             risk = 12.0
 

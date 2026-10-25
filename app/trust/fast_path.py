@@ -29,20 +29,14 @@ from app.models.context import AnalysisContext
 from app.models.enums import Capability, Decision, Environment, ResourceClass, Scope
 from app.trust.fingerprint_store import FingerprintStore
 
-#: capability sets that can never take the fast path
 INVARIANT_CAPABILITIES = {Capability.PRIVILEGE_CHANGE, Capability.AUTHENTICATE}
-#: resource classes that can never take the fast path
 INVARIANT_RESOURCES = {ResourceClass.CREDENTIAL_STORE, ResourceClass.PRODUCTION_RESOURCE,
                        ResourceClass.SYSTEM_PATH, ResourceClass.SENSITIVE_TABLE}
 
-#: capabilities that observe without changing anything
 READING = {Capability.READ, Capability.NETWORK, Capability.DATABASE, Capability.DOWNLOAD,
            Capability.SENSOR_ACCESS}
-#: capabilities that push data or effects across the trust boundary
 OUTWARD = {Capability.UPLOAD, Capability.EMAIL}
-#: capabilities that destroy or take over
 DESTRUCTIVE = {Capability.DELETE, Capability.EXECUTE, Capability.PRIVILEGE_CHANGE}
-#: resource classes that sit outside the organisation
 EXTERNAL_RESOURCES = {ResourceClass.EXTERNAL_ENDPOINT, ResourceClass.EMAIL_RECIPIENT_EXTERNAL,
                       ResourceClass.BINARY}
 
@@ -118,7 +112,6 @@ class FastPathEvaluator:
             return FastPathVerdict(False, [Check("enabled", False, "fast path disabled by policy")],
                                    "fast path disabled")
 
-        # --- 1. threshold checks (the specified gate) -------------------
         checks.append(Check(
             "similarity",
             match.similarity_score >= cfg.fingerprint_similarity_threshold,
@@ -150,7 +143,6 @@ class FastPathEvaluator:
             f"seen {match.occurrence_count}x, need {cfg.fast_path_min_occurrences}",
         ))
 
-        # --- 2. never-fast-path invariants ------------------------------
         invariant = self._invariant_reason(context)
         checks.append(Check(
             "invariant guard",
@@ -158,7 +150,6 @@ class FastPathEvaluator:
             invariant or "behaviour is not in a never-fast-path category",
         ))
 
-        # --- 3. lightweight validation ----------------------------------
         checks.extend(self._validation_checks(context))
 
         eligible = all(c.passed for c in checks)
@@ -172,7 +163,6 @@ class FastPathEvaluator:
             reason = f"full analysis required: {first.name} ({first.detail})"
         return FastPathVerdict(eligible, checks, reason)
 
-    # -- guards -----------------------------------------------------------
     def _invariant_reason(self, context: AnalysisContext) -> str | None:
         severity = context.extras.get("policy_severity", "NONE")
         if severity != "NONE":

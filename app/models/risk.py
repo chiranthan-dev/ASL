@@ -40,11 +40,7 @@ class RiskAssessment(BaseModel):
     capabilities: list[Capability] = Field(default_factory=list)
     invariants: list[str] = Field(default_factory=list)
     disagreement: float = Field(default=0.0, ge=0.0, le=1.0)
-    #: risk attributable to the behaviour alone, stripped of circumstance
-    #: (user, environment, novelty). This is what a fingerprint remembers.
     behavioural_risk: float = Field(default=0.0, ge=0.0, le=100.0)
-    #: risk of this call taken in isolation -- excludes the session chain,
-    #: so a per-call fingerprint is never charged for its neighbours.
     call_risk: float = Field(default=0.0, ge=0.0, le=100.0)
     explanation: str = ""
 

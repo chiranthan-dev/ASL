@@ -25,9 +25,6 @@ router = APIRouter(prefix="/api/gateway", tags=["gateway"])
 
 _lock = threading.Lock()
 _approvals: dict[str, dict[str, Any]] = {}
-# Decisions the per-call audit table never sees: a request answered without any
-# tool, a request refused before any tool, and a person confirming or denying a
-# held call. The console's log merges these with the audit rows.
 _activity: deque[dict[str, Any]] = deque(maxlen=200)
 
 

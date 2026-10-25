@@ -17,12 +17,8 @@ from app.models.enums import Decision
 from app.trust.fingerprint_store import FingerprintStore
 
 TRUST_GAIN_PER_SUCCESS = 0.02
-#: A refusal is serious: we declined to do what the account asked for.
 TRUST_LOSS_PER_BLOCK = 0.25
-#: Diverted into a sandbox -- uncertain, but contained and not refused.
 TRUST_LOSS_PER_SANDBOX = 0.05
-#: Referred to a human. This is the layer working as intended, not a strike
-#: against the account, so it costs half of what one clean action earns.
 TRUST_LOSS_PER_CHALLENGE = 0.01
 TRUST_LOSS_PER_ANOMALY = 0.10
 TRUST_FLOOR = 0.05
@@ -64,8 +60,6 @@ class TrustMemory:
             blocks += 1
             trust -= TRUST_LOSS_PER_SANDBOX
         elif decision is Decision.CHALLENGE:
-            # Counted, but not held against the account: being asked to confirm
-            # is a normal outcome for legitimate high-impact work.
             trust -= TRUST_LOSS_PER_CHALLENGE
         if anomalous:
             anomalies += 1

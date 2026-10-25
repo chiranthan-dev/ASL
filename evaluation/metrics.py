@@ -34,14 +34,13 @@ class Metrics:
     false_positives: int = 0
     true_negatives: int = 0
     false_negatives: int = 0
-    over_blocked: int = 0            # benign scenarios hard-blocked
+    over_blocked: int = 0
     fast_path: int = 0
     fingerprint_hits: int = 0
     human_verifications: int = 0
     latencies: list[float] = field(default_factory=list)
     per_category: dict[str, dict[str, int]] = field(default_factory=dict)
 
-    # -- rates ------------------------------------------------------------
     @property
     def precision(self) -> float:
         denominator = self.true_positives + self.false_positives

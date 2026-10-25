@@ -44,7 +44,6 @@ SENSITIVE_TABLE_RE = re.compile(
 )
 
 INJECTION_PATTERNS: tuple[tuple[str, str, Severity], ...] = (
-    # `OR 1=1`, `OR '1'='1'`, `OR name = name` - a comparison that is always true
     ("SQL_TAUTOLOGY", r"""(?i)\bor\s+['"]?(\w+)['"]?\s*=\s*['"]?\1['"]?""", Severity.CRITICAL),
     ("SQL_UNION_INJECTION", r"(?i)\bunion\s+(all\s+)?select\b", Severity.HIGH),
     ("SQL_COMMENT_TRUNCATION", r"(--|#)\s*$|/\*.*\*/", Severity.MEDIUM),
@@ -59,8 +58,6 @@ FILE_ACCESS_PATTERNS: tuple[tuple[str, str, Severity, list[Capability]], ...] = 
     ("SQL_PG_READ_FILE", r"(?i)\bpg_read_file\s*\(", Severity.CRITICAL, [Capability.READ]),
 )
 
-#: The optional article tolerates planner output such as "delete from the users
-#: table", which otherwise records a table called `the` and hides `users`.
 TABLE_RE = re.compile(
     r"(?is)\b(?:from|into|update|join|table)\s+(?:the\s+)?[\"`\[]?(?!(?:table|where|to|set|values|select|as|with|on|if)\b)([a-zA-Z_][\w$]*(?:\.[a-zA-Z_][\w$]*)?)"
 )
@@ -141,8 +138,6 @@ def analyze_sql(query: str, tool_name: str = "database.select") -> ArgumentAnaly
         caps, severity = STATEMENT_CAPABILITIES.get(verb, ([Capability.DATABASE], Severity.MEDIUM))
         capabilities.update(caps)
 
-        # A WHERE clause that is always true bounds nothing: `DELETE ... WHERE
-        # 1=1` and `TRUNCATE` remove the same rows and must score as one act.
         has_where = bool(re.search(r"(?is)\bwhere\b", statement)) and not TAUTOLOGY_WHERE_RE.search(statement)
         unbounded = verb in {"DELETE", "UPDATE"} and not has_where
         if verb in {"DROP", "TRUNCATE"}:

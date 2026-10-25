@@ -1,9 +1,3 @@
-/* Shared stage rendering.
- *
- * Both surfaces — the inspector dashboard and the chat — show the same trace,
- * so the "what does this stage mean" logic lives here once. If the two ever
- * disagreed about what a stage said, the demo would be lying about the system.
- */
 
 (function (global) {
   "use strict";
@@ -53,7 +47,6 @@
     </svg>`;
   }
 
-  /* ─────────────────────── per-stage renderers ─────────────────────── */
   const RENDERERS = {
     agent: (d) => `
       <div class="why">The agent is <b>not</b> a security component. It may propose something reckless —
@@ -307,7 +300,6 @@
       </div>`;
   }
 
-  /* ───────────────────────── behavior graph ───────────────────────── */
   function graphSvg(detail) {
     const nodes = (detail.nodes || []).filter((n) => n.kind !== "CAPABILITY");
     const edges = (detail.edges || []).filter((e) =>
@@ -336,9 +328,6 @@
       const p = pos[n.id]; if (!p) return "";
       const label = n.kind === "INVOCATION" ? (n.tool || n.label) : (n.resource_class || n.label);
       const caps = n.kind === "INVOCATION" ? n.label : "";
-      // Light palette: tinted fills with dark text, matching the verdict colours
-      // used elsewhere. The previous values were dark-theme leftovers, which put
-      // near-black ink on near-black rectangles.
       const fill = n.kind === "INVOCATION"
         ? (n.risk >= 80 ? "#fbeceb" : n.risk >= 45 ? "#fbf1e0" : "#e9f0fb") : "#f2f4f7";
       const stroke = n.kind === "INVOCATION"

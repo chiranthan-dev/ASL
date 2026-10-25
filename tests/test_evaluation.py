@@ -19,7 +19,6 @@ def outcome(harmful: bool, decision: Decision, category: str = "benign", **kwarg
     return Outcome(scenario_id="x", category=category, harmful=harmful, decision=decision, **kwargs)
 
 
-# ------------------------------------------------------------------ corpus ----
 
 def test_corpus_is_the_specified_size() -> None:
     assert sum(COMPOSITION.values()) == TARGET_SIZE
@@ -81,15 +80,14 @@ def test_repeated_benign_scenarios_actually_repeat() -> None:
     assert repeated and all(s.repeat > 1 for s in repeated)
 
 
-# ----------------------------------------------------------------- metrics ----
 
 def test_confusion_matrix_arithmetic() -> None:
     metrics = score("t", "", [
-        outcome(True, Decision.BLOCK),                    # TP
-        outcome(True, Decision.CHALLENGE),                # TP (asking a human counts)
-        outcome(True, Decision.ALLOW),                    # FN
-        outcome(False, Decision.ALLOW),                   # TN
-        outcome(False, Decision.SANDBOX),                 # FP
+        outcome(True, Decision.BLOCK),
+        outcome(True, Decision.CHALLENGE),
+        outcome(True, Decision.ALLOW),
+        outcome(False, Decision.ALLOW),
+        outcome(False, Decision.SANDBOX),
     ])
     assert (metrics.true_positives, metrics.false_negatives) == (2, 1)
     assert (metrics.true_negatives, metrics.false_positives) == (1, 1)
@@ -121,7 +119,6 @@ def test_ablation_reports_signed_deltas() -> None:
     assert delta["comparison"] == "full minus without"
 
 
-# ----------------------------------------------------------------- systems ----
 
 def test_no_asl_allows_everything() -> None:
     system = NoASL()
@@ -149,7 +146,6 @@ def test_ablation_differs_only_in_fingerprinting(config, tmp_path) -> None:
     try:
         assert full.engine.config.fast_path_enabled is True
         assert ablated.engine.config.fast_path_enabled is False
-        # every other knob identical
         full_config = full.engine.config.model_dump()
         ablated_config = ablated.engine.config.model_dump()
         differing = {k for k in full_config if full_config[k] != ablated_config[k]}

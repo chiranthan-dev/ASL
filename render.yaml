@@ -1,7 +1,3 @@
-# One-click deploy to Render (https://render.com).
-# New > Blueprint > connect this repository. Render reads this file and
-# provisions a free web service. The public demo runs the deterministic mock
-# planner; no API key or model server is required.
 services:
   - type: web
     name: asl-adaptive-security-layer

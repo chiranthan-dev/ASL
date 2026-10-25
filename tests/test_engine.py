@@ -19,7 +19,6 @@ def run(engine: ASLEngine, prompt: str, *, user="u1", env=Environment.SANDBOX, s
     ))
 
 
-# ------------------------------------------------------------ end to end ----
 
 def test_any_prompt_produces_a_full_trace(engine: ASLEngine) -> None:
     result = run(engine, "qwerty nonsense that matches nothing")
@@ -69,7 +68,6 @@ def test_same_tool_different_arguments_diverge(engine: ASLEngine) -> None:
     assert safe.calls[0].fingerprint != danger.calls[0].fingerprint
 
 
-# -------------------------------------------------------------- fast path ----
 
 def test_fast_path_requires_repetition_then_engages(engine: ASLEngine) -> None:
     outcomes = [run(engine, "Look up a nice dog picture.", user="alice", session=f"a{i}")
@@ -126,8 +124,6 @@ def test_outward_behaviour_never_earns_the_fast_path(engine: ASLEngine) -> None:
 def test_behaviour_classes(engine: ASLEngine) -> None:
     from app.trust.fast_path import INTERNAL_EFFECT, OUTWARD_OR_DESTRUCTIVE, READ_ONLY
 
-    # Classification is asserted through its observable consequences rather than
-    # by reaching into the engine for a context it does not expose.
     read_only = run(engine, "", calls=[ToolInvocation(tool_name="web_search", arguments={"query": "x"})])
     internal = run(engine, "", calls=[ToolInvocation(tool_name="filesystem.write",
                                                     arguments={"path": "/home/user/a.txt", "content": "hi"})])
@@ -151,7 +147,6 @@ def test_fast_path_is_per_user(engine: ASLEngine) -> None:
     assert stranger.fast_path is False
 
 
-# --------------------------------------------------------------- analyzers ----
 
 def test_intent_reads_evidence_not_the_prompt(engine: ASLEngine) -> None:
     result = run(engine, "just a totally routine harmless cleanup please",
@@ -200,7 +195,6 @@ def test_execution_chain_outranks_its_parts(engine: ASLEngine) -> None:
     assert hostile_chain > benign_chain + 40
 
 
-# ------------------------------------------------------------ risk fusion ----
 
 def test_fusion_is_not_an_average(engine: ASLEngine) -> None:
     result = run(engine, "Delete all files in the production directory", env=Environment.PRODUCTION)
@@ -244,7 +238,6 @@ def test_unknown_tool_is_penalised_not_trusted(engine: ASLEngine) -> None:
     assert result.decision is not Decision.ALLOW
 
 
-# --------------------------------------------------------- decision engine ----
 
 def test_decision_bands(config) -> None:
     engine = DecisionEngine(config)
@@ -268,7 +261,6 @@ def test_session_rollup_takes_the_strictest(engine: ASLEngine) -> None:
     assert DecisionEngine.summarize([Decision.ALLOW, Decision.ALLOW]) is Decision.ALLOW
 
 
-# ------------------------------------------------------- audit & learning ----
 
 def test_every_decision_is_audited(engine: ASLEngine) -> None:
     run(engine, "Look up a nice dog picture.")
@@ -297,7 +289,6 @@ def test_reset_clears_learning(engine: ASLEngine) -> None:
     assert engine.store.count() == 0
 
 
-# -------------------------------------------------------------- execution ----
 
 def test_blocked_calls_are_never_executed(engine: ASLEngine) -> None:
     before = len(engine.tools.call_log)
@@ -311,21 +302,18 @@ def test_allowed_calls_reach_the_mock(engine: ASLEngine) -> None:
     assert len(engine.tools.call_log) == before + 1
 
 
-# ------------------------------------------------------- anomaly: novelty ----
 
 def test_novelty_alone_is_not_an_anomaly_when_the_next_step_only_reads() -> None:
     from app.analyzers.anomaly_detector import StatisticalAnomalyDetector as D
 
     assert D._benign_transition("READ-SEQUENCE->READ")
     assert D._benign_transition("EMAIL-SEQUENCE->READ")
-    # a step that can act, or data flowing between steps, stays significant
     assert not D._benign_transition("READ-SEQUENCE->UPLOAD")
     assert not D._benign_transition("READ-DATA_FLOW->READ")
     assert not D._benign_transition("DOWNLOAD-DATA_FLOW->EXECUTE")
 
 
 def test_a_repeated_calculation_is_not_flagged_as_unusual(engine: ASLEngine) -> None:
-    # enough history that the detector is allowed to flag at all
     for i, prompt in enumerate(("Look up a nice dog picture.", "Summarize the file /home/user/notes.txt",
                                 "What is 45 * 3 + 10?")):
         run(engine, prompt, user="carol", session=f"c_warm{i}")

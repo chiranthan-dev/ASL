@@ -33,7 +33,6 @@ class ToolRegistry:
         self.analyzer_hints: dict[str, list[str]] = raw.get("analyzer_hints", {})
         self.unknown_defaults: dict[str, Any] = raw.get("unknown_tool_defaults", {})
 
-    # -- lookup ---------------------------------------------------------
     def get(self, tool_name: str) -> ToolProfile | None:
         return self.profiles.get(tool_name)
 
@@ -72,8 +71,6 @@ class ToolRegistry:
         if not caps:
             caps = {Capability(c) for c in self.unknown_defaults.get("capabilities", ["READ"])}
         else:
-            # Some evidence about the tool raises confidence, but never to the
-            # level of a registered tool.
             confidence = min(0.6, confidence + 0.1 * hits)
 
         profile = ToolProfile(

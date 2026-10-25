@@ -33,17 +33,12 @@ class CallEvaluation(BaseModel):
 
     call_id: str
     tool_name: str
-    #: what the call asked for; kept so a held call can run after a human confirms
     arguments: dict[str, Any] = Field(default_factory=dict)
     decision: Decision
     risk_score: float
     confidence: float
     fast_path: bool = False
     fingerprint: str | None = None
-    #: the *sequence* fingerprint for the session so far. This, not `fingerprint`,
-    #: is what the store keys authorization memory on -- a single call collapses to
-    #: one of a few dozen capability/resource shapes, while the sequence is what
-    #: actually distinguishes behaviours.
     chain_fingerprint: str | None = None
     fingerprint_novelty: float | None = None
     capabilities: list[Capability] = Field(default_factory=list)
@@ -66,10 +61,10 @@ class TraceEvent(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     index: int
-    stage: str                       # machine id, e.g. "argument_analyzer"
-    title: str                       # human title, e.g. "2. Argument Analyzer"
-    status: str = "ok"               # ok | skipped | warning | critical
-    summary: str = ""                # one line the UI shows while animating
+    stage: str
+    title: str
+    status: str = "ok"
+    summary: str = ""
     detail: dict[str, Any] = Field(default_factory=dict)
     highlights: list[str] = Field(default_factory=list)
     duration_ms: float = 0.0
@@ -93,10 +88,7 @@ class EvaluationResponse(BaseModel):
     prompt: str = ""
     environment: Environment = Environment.SANDBOX
     agent_reasoning: str = ""
-    #: the agent's reply to the user, written by a live model after authorization;
-    #: empty when the planner is the mock (the UI then uses its template reply)
     answer: str = ""
-    #: who planned: "mock", "mock-fallback", "caller" or "llm:<model>"
     planner: str = ""
     calls: list[CallEvaluation] = Field(default_factory=list)
     trace: list[TraceEvent] = Field(default_factory=list)

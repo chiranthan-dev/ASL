@@ -25,13 +25,7 @@ ANALYZER = "email"
 
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
 
-#: Domains treated as inside the organisation.  Configurable in a deployment;
-#: kept here as a research default.
 INTERNAL_DOMAINS = {"university.edu", "example.edu", "example.com", "internal.local",
-                    # The demo corpus addresses colleagues at company.com. Leaving
-                    # it out meant every "mail this to a colleague" workflow was
-                    # scored as leaving the organisation, which is what made the
-                    # read-then-mail chain fire on ordinary work.
                     "company.com"}
 
 DISPOSABLE_DOMAIN_RE = re.compile(
@@ -141,8 +135,6 @@ def analyze_email(arguments: dict[str, Any], tool_name: str = "gmail.send") -> A
     findings = dedupe_findings(findings)
     capabilities = merge_finding_capabilities(findings, capabilities)
     scope = Scope.MULTIPLE if len(recipients) > 1 else Scope.SINGLE
-    # An internal message with no attachments and no sensitive content is one
-    # of the most ordinary things an assistant does; base risk reflects that.
     base = 12.0 if (recipients and not external and not attachments) else 20.0
     risk = aggregate_risk(findings, scope, base=base)
     return ArgumentAnalysis(

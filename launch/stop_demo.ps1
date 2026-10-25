@@ -1,7 +1,3 @@
-<#
-  Stops what start_demo.ps1 started: the ASL server on port 8000 and any
-  Cloudflare quick tunnel. Ollama is left running (other apps may use it).
-#>
 $Port = 8000
 
 $owners = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
@@ -14,7 +10,6 @@ foreach ($id in $owners) {
     }
 }
 
-# Only quick tunnels pointed at this demo; a named tunnel or service is left alone.
 Get-CimInstance Win32_Process -Filter "Name = 'cloudflared.exe'" |
     Where-Object { $_.CommandLine -match "--url\s+\S*:$Port" } | ForEach-Object {
         Stop-Process -Id $_.ProcessId -Force

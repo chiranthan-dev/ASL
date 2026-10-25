@@ -12,7 +12,6 @@ from app.core.config import ASLConfig, get_config
 from app.models.context import AnalysisContext
 from app.models.enums import Capability, Environment
 
-#: environment -> (base risk contribution, multiplier applied to destructive actions)
 ENVIRONMENT_PROFILE: dict[Environment, tuple[float, float]] = {
     Environment.SANDBOX: (5.0, 0.75),
     Environment.DEVELOPMENT: (12.0, 0.9),
@@ -90,7 +89,6 @@ class TrustAnalyzer:
                 {"trust_score": state.trust_score, "known": False},
             )
 
-        # Trust 0.95 -> 12 risk; trust 0.05 -> 88 risk.
         risk = round(100.0 - state.trust_score * 92.0, 2)
         notes = [
             f"trust {state.trust_score:.2f} across {state.successful_actions} allowed "

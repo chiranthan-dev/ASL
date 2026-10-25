@@ -26,7 +26,6 @@ from app.models.tool_call import ArgumentAnalysis, Finding, ResourceDescriptor
 
 ANALYZER = "python"
 
-#: dotted call name -> (capabilities, severity, message)
 CALL_SEMANTICS: dict[str, tuple[list[Capability], Severity, str]] = {
     "os.remove": ([Capability.DELETE], Severity.HIGH, "deletes a file"),
     "os.unlink": ([Capability.DELETE], Severity.HIGH, "deletes a file"),
@@ -79,7 +78,6 @@ CALL_SEMANTICS: dict[str, tuple[list[Capability], Severity, str]] = {
 
 DANGEROUS_MODULES = {"subprocess", "ctypes", "pty", "marshal", "pickle", "socket"}
 
-#: calls whose effect is inherently recursive, whatever the path looks like
 RECURSIVE_CALLS = {"shutil.rmtree", "os.removedirs", "shutil.copytree"}
 
 
@@ -150,7 +148,6 @@ class _Visitor(ast.NodeVisitor):
         self.shell_commands: list[str] = []
         self.dynamic_code = False
 
-    # -- imports ----------------------------------------------------
     def visit_Import(self, node: ast.Import) -> None:
         for alias in node.names:
             self.aliases[alias.asname or alias.name.split(".")[0]] = alias.name
@@ -172,7 +169,6 @@ class _Visitor(ast.NodeVisitor):
             ))
         self.generic_visit(node)
 
-    # -- calls ------------------------------------------------------
     def visit_Call(self, node: ast.Call) -> None:
         name = _dotted(node.func)
         resolved = self._resolve(name)
@@ -201,7 +197,6 @@ class _Visitor(ast.NodeVisitor):
 
         self.generic_visit(node)
 
-    # -- helpers ----------------------------------------------------
     def _resolve(self, dotted: str) -> str:
         """Rewrite the first segment through the import alias table."""
         if not dotted:
@@ -263,7 +258,6 @@ class _Visitor(ast.NodeVisitor):
         elif resolved.startswith(("requests.", "httpx.", "urllib")):
             self._record_url(first)
         elif resolved in {"__import__", "importlib.import_module", "base64.b64decode"}:
-            # The argument names a module or carries data, not a filesystem target.
             pass
         elif "socket" in resolved:
             self.resources.append(ResourceDescriptor(
@@ -331,7 +325,6 @@ def analyze_python(code: str) -> ArgumentAnalysis:
         ))
     findings.extend(scan_secrets(code, ANALYZER))
 
-    # Delegate embedded shell commands to the shell analyzer.
     if shell_commands:
         from app.analyzers.arg.shell_arg import analyze_shell
 

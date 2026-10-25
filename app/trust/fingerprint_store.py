@@ -124,19 +124,9 @@ CREATE TABLE IF NOT EXISTS policy_versions (
 );
 """
 
-#: how quickly confidence saturates with clean repetitions
 CONFIDENCE_TAU = 1.25
-#: weight of a new observation when historical risk is *falling*
 RISK_DECAY_ALPHA = 0.25
 
-#: Risk at which a fingerprint's confidence starts being discounted.
-#:
-#: This must not sit below the highest fast-path ceiling. It previously sat at
-#: 20 while the INTERNAL_EFFECT ceiling was 25, and the 0.8 discount capped
-#: confidence at 0.792 against a 0.95 gate -- so anything scoring 20-25 was
-#: barred from the fast path by a constant that no policy mentions, and the
-#: configured ceiling of 25 was unreachable. Aligning the two leaves the stated
-#: policy (10 read-only, 25 internal, never outward) as the only thing deciding.
 RISK_DISCOUNT_AT = 25.0
 RISK_HEAVY_DISCOUNT_AT = 50.0
 
@@ -184,25 +174,15 @@ class FingerprintStore:
         self.config = config or get_config()
         self.path = str(path or self.config.database_path)
         self.generator = FingerprintGenerator(self.config)
-        # Re-entrant: find_best_match calls _candidates, record_observation calls get.
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(self.path, check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
-        # One decision writes ~7 rows across 4 tables (fingerprint statistics,
-        # observations, anomaly baselines, trust, audit). In the default
-        # rollback journal at synchronous=FULL each of those is its own fsync,
-        # which measured as ~3 ms per commit and made authorization latency
-        # dominated by disk sync rather than by analysis. WAL plus
-        # synchronous=NORMAL keeps the database crash-safe and only risks losing
-        # the most recent commits on a power failure — an acceptable trade for
-        # statistics and, with this documented, for a research audit log.
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute(f"PRAGMA synchronous={self.config.sqlite_synchronous}")
         self._conn.executescript(SCHEMA)
         self._conn.commit()
         self._record_policy_version()
 
-    # -- lifecycle ------------------------------------------------------
     @synchronized
     def close(self) -> None:
         self._conn.close()
@@ -226,7 +206,6 @@ class FingerprintStore:
                 (self.config.policy_version, utcnow().isoformat(), self.config.model_dump_json()),
             )
 
-    # -- writes ---------------------------------------------------------
     @synchronized
     def upsert(self, fingerprint: BehavioralFingerprint) -> BehavioralFingerprint:
         """Insert a fingerprint if new; return the stored version with statistics."""
@@ -275,14 +254,6 @@ class FingerprintStore:
         stored = self.get(fingerprint.fingerprint_id)
         assert stored is not None
 
-        # A block is charged to the shared behaviour only when the *behaviour*
-        # earned it. `risk_score` here is already behavioural (see AuditLogger.
-        # learn), so an intervention driven purely by circumstance -- an
-        # untrusted user, a production environment, a refused purpose -- must not
-        # count against a fingerprint that thousands of legitimate sessions
-        # share. This is the same asymmetry `historical_risk` already observes;
-        # leaving it out of the counter reopened the poisoning channel through
-        # `confidence`, which collapses as 0.2/blocks and never recovers.
         intervened = decision in (Decision.BLOCK, Decision.CHALLENGE, Decision.SANDBOX)
         blocked = intervened and risk_score >= self.config.risk_log_threshold
         succeeded = decision in (Decision.ALLOW, Decision.ALLOW_WITH_LOG) and outcome != "failure"
@@ -339,7 +310,6 @@ class FingerprintStore:
             confidence *= 0.8
         return round(min(0.99, max(0.0, confidence)), 4)
 
-    # -- reads ----------------------------------------------------------
     @synchronized
     def get(self, fingerprint_id: str) -> BehavioralFingerprint | None:
         row = self._conn.execute(
@@ -363,17 +333,12 @@ class FingerprintStore:
         ).fetchall()
         return [dict(r) for r in rows]
 
-    # -- demo library (seed_library.py) ---------------------------------
-    # The library records ONE representative prompt/tool-call per fingerprint so
-    # the UI can show a human what a fingerprint actually means. It is a display
-    # aid: nothing in the authorization path reads it, because a fingerprint's
-    # meaning must come from its canonical form, not from a stored label.
     @synchronized
     def ensure_library_table(self) -> None:
         self._conn.executescript(LIBRARY_SCHEMA)
         cols = {r["name"] for r in
                 self._conn.execute("PRAGMA table_info(fingerprint_library)")}
-        if "calls" not in cols:  # migrate a store seeded before replay existed
+        if "calls" not in cols:
             self._conn.execute(
                 "ALTER TABLE fingerprint_library ADD COLUMN calls TEXT NOT NULL DEFAULT '[]'")
         self._conn.commit()
@@ -425,21 +390,10 @@ class FingerprintStore:
             where.append("l.population = ?")
             params.append(population)
         if eligible:
-            # The three fingerprint-side conditions the fast path requires. The
-            # per-user provenance checks cannot be answered here -- they depend
-            # on who is asking -- so a row shown by this filter is *capable* of
-            # the fast path, not guaranteed to take it on the first replay.
-            # Only single-step shapes can qualify: authorization memory is keyed
-            # on what one call does, so a multi-step chain is never the thing the
-            # fast path consults.
             where.append("f.canonical_representation NOT LIKE '%;%'")
             where.append("f.blocked_executions = 0")
             where.append("f.confidence >= ?")
             params.append(self.config.fingerprint_confidence_threshold)
-            # The risk ceiling is per class, so it is applied row by row below.
-            # Using max(ceilings) here listed READ_ONLY shapes that cleared 25 but
-            # not their own ceiling of 10 -- the filter promised a fast path it
-            # could not deliver.
         if query:
             where.append(
                 "(f.canonical_representation LIKE ? OR IFNULL(l.prompt,'') LIKE ? "
@@ -447,8 +401,6 @@ class FingerprintStore:
                 " OR f.resource_classes LIKE ? OR f.fingerprint_id LIKE ?)")
             params.extend([f"%{query}%"] * 6)
         clause = " AND ".join(where)
-        # When filtering to fast-path candidates, the lowest-risk behaviours are
-        # the ones that will actually clear a per-class ceiling, so lead with them.
         order = ("f.historical_risk ASC, f.occurrence_count DESC" if eligible
                  else "f.occurrence_count DESC, f.historical_risk ASC")
 
@@ -487,7 +439,6 @@ class FingerprintStore:
             d["population"] = d["population"] or "runtime"
             d["decision"] = d["decision"] or ""
             if not d["tool_name"]:
-                # No seeded example: describe it from the canonical form itself.
                 d["tool_name"] = " -> ".join(
                     st.split("@")[0].replace("CAPS[", "").replace("]", "")
                     for st in (d["canonical_representation"] or "")
@@ -551,7 +502,6 @@ class FingerprintStore:
     def count(self) -> int:
         return int(self._conn.execute("SELECT COUNT(*) AS n FROM fingerprints").fetchone()["n"])
 
-    # -- similarity search (spec section 7) ------------------------------
     @synchronized
     def find_best_match(
         self, query: BehavioralFingerprint, user_id: str | None = None
@@ -617,9 +567,6 @@ class FingerprintStore:
             similarity_score=round(score, 4),
             historical_risk=candidate.historical_risk if exact else max(candidate.historical_risk, 0.0),
             previous_outcome=previous,
-            # Confidence in the *match* is the stored confidence discounted by
-            # how far the query is from it: a 0.8-similar neighbour cannot lend
-            # its full track record to a behaviour we have not actually seen.
             confidence=round(candidate.confidence * score, 4),
             novelty_score=self.generator.novelty(score),
             occurrence_count=candidate.occurrence_count,
@@ -657,7 +604,6 @@ class FingerprintStore:
         ).fetchall()
         return {r["user_id"] for r in rows}
 
-    # -- anomaly statistics (used by phase 13 detector) -------------------
     @synchronized
     def observe_stat(self, scope: str, key: str, value: float) -> tuple[float, float, int]:
         """Welford update; returns (mean, stddev, count) *before* this value."""
@@ -688,7 +634,6 @@ class FingerprintStore:
         ).fetchone()
         return int(row["count"]) if row else 0
 
-    # -- audit ------------------------------------------------------------
     @synchronized
     def write_audit(self, record: dict[str, Any]) -> None:
         with self._conn:
@@ -718,7 +663,6 @@ class FingerprintStore:
             out.append(entry)
         return out
 
-    # -- user trust rows (used by TrustMemory) ----------------------------
     @synchronized
     def user_row(self, user_id: str) -> dict[str, Any] | None:
         row = self._conn.execute("SELECT * FROM users WHERE user_id=?", (user_id,)).fetchone()
@@ -757,7 +701,6 @@ class FingerprintStore:
             )
         return merged
 
-    # -- helpers ----------------------------------------------------------
     @staticmethod
     def _row_to_fingerprint(row: sqlite3.Row) -> BehavioralFingerprint:
         return BehavioralFingerprint(

@@ -1,13 +1,3 @@
-<#
-  ASL demo launcher.
-
-    start_demo.ps1            Ollama + ASL Gateway on http://localhost:8000, opens the browser
-    start_demo.ps1 -Public    the same, plus a Cloudflare quick tunnel with a public link
-
-  Safe to run twice: anything already running is reused, not started again.
-  Closing this window stops the public link; the ASL server keeps running in
-  its own minimised window until you close that (or run stop_demo.ps1).
-#>
 param([switch]$Public)
 
 $ErrorActionPreference = 'Stop'
@@ -15,7 +5,6 @@ $Host.UI.RawUI.WindowTitle = if ($Public) { 'ASL Demo (public link)' } else { 'A
 
 $Root   = Split-Path -Parent $PSScriptRoot
 $Port   = 8000
-# 127.0.0.1, not localhost: PowerShell tries IPv6 first and stalls ~2s on it.
 $Local  = "http://127.0.0.1:$Port"
 $Model  = 'qwen2.5:7b'
 
@@ -45,7 +34,6 @@ Write-Host ''
 Write-Host '  ASL - Adaptive Security Layer' -ForegroundColor Cyan
 Write-Host ''
 
-# ---------------------------------------------------------------- Ollama ----
 $ollama = Find-Exe 'ollama' @("$env:LOCALAPPDATA\Programs\Ollama\ollama.exe")
 $live = $false
 if (-not $ollama) {
@@ -69,7 +57,6 @@ if (-not $ollama) {
     }
 }
 
-# ------------------------------------------------------------ ASL server ----
 if (Test-Url "$Local/health") {
     Say "ASL is already running on http://localhost:$Port" Green
 } else {
@@ -92,7 +79,6 @@ if (Test-Url "$Local/health") {
     Say "ASL is running on http://localhost:$Port" Green
 }
 
-# A query string the browser has never cached, so it always loads the current page.
 Start-Process "http://localhost:$Port/?demo"
 
 if (-not $Public) {
@@ -102,7 +88,6 @@ if (-not $Public) {
     exit 0
 }
 
-# ---------------------------------------------------------- public link ----
 $cloudflared = Find-Exe 'cloudflared' @("${env:ProgramFiles(x86)}\cloudflared\cloudflared.exe",
                                         "$env:ProgramFiles\cloudflared\cloudflared.exe")
 if (-not $cloudflared) {

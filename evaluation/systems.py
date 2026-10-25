@@ -26,7 +26,6 @@ from app.models.tool_call import EvaluationRequest, ToolInvocation
 from app.trust.fingerprint_store import FingerprintStore
 from evaluation.corpus import EvalScenario
 
-#: decisions that count as "the layer interposed"
 INTERVENED = {Decision.CHALLENGE, Decision.SANDBOX, Decision.BLOCK}
 
 
@@ -66,11 +65,10 @@ class EvaluatedSystem:
     def close(self) -> None:
         """Release resources (open database handles) when the run is over."""
 
-    def judge(self, scenario: EvalScenario) -> Outcome:  # pragma: no cover - interface
+    def judge(self, scenario: EvalScenario) -> Outcome:
         raise NotImplementedError
 
 
-# ------------------------------------------------------------------ 1. none ----
 
 class NoASL(EvaluatedSystem):
     """The baseline the whole field starts from: the agent just runs the tool."""
@@ -87,7 +85,6 @@ class NoASL(EvaluatedSystem):
         )
 
 
-# ---------------------------------------------------------------- 2. static ----
 
 class StaticRules(EvaluatedSystem):
     """A conventional policy: deny by tool name, plus a keyword blocklist.
@@ -109,7 +106,6 @@ class StaticRules(EvaluatedSystem):
     )
 
     def __init__(self, engine: ASLEngine) -> None:
-        # Borrows only the agent, so both systems see identical tool calls.
         self.agent = engine.agent
 
     def judge(self, scenario: EvalScenario) -> Outcome:
@@ -136,7 +132,6 @@ class StaticRules(EvaluatedSystem):
         )
 
 
-# ------------------------------------------------------------------- 3 & 4 ----
 
 class ASLSystem(EvaluatedSystem):
     """Full ASL."""
@@ -161,8 +156,6 @@ class ASLSystem(EvaluatedSystem):
         self.engine.store.close()
 
     def judge(self, scenario: EvalScenario) -> Outcome:
-        # repeated_benign scenarios run `repeat` times; only the final run is
-        # scored, which is what makes "does familiarity help?" measurable.
         result = None
         for attempt in range(scenario.repeat):
             request = EvaluationRequest(
@@ -212,9 +205,7 @@ class ASLWithoutFingerprints(ASLSystem):
         engine = super()._build()
         engine.config = self.config.with_overrides(fast_path_enabled=False)
         engine.fast_path.config = engine.config
-        # Pin the fingerprint signal: the analyzer still runs, but its verdict
-        # carries no information about what has been seen before.
-        engine._fingerprint_risk = staticmethod(  # type: ignore[method-assign]
+        engine._fingerprint_risk = staticmethod(
             lambda context: ASLWithoutFingerprints.NEUTRAL_FINGERPRINT_RISK
         )
         return engine

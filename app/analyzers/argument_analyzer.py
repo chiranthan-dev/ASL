@@ -58,7 +58,6 @@ class ArgumentAnalyzer:
             "generic": self._generic,
         }
 
-    # -- routes ---------------------------------------------------------
     def _python(self, call: ToolInvocation) -> ArgumentAnalysis:
         return analyze_python(_first_string(call.arguments, ("code", "source", "script")))
 
@@ -80,16 +79,10 @@ class ArgumentAnalyzer:
     def _generic(self, call: ToolInvocation) -> ArgumentAnalysis:
         return analyze_generic(call.arguments, call.tool_name)
 
-    # -- entry point ----------------------------------------------------
     def analyze(self, call: ToolInvocation, profile: ToolProfile | None = None) -> ArgumentAnalysis:
         analyzer_name = (profile.analyzer if profile else "generic") or "generic"
         sniffed = False
         if analyzer_name == "generic":
-            # For tools the registry does not describe, the *shape of the
-            # arguments* is the next best evidence: a call carrying `path` and
-            # `recursive` is a filesystem operation whatever it calls itself.
-            # This is what keeps an unregistered tool from fingerprinting
-            # differently to a registered one doing the same thing.
             guess = self.sniff_analyzer(call.arguments)
             if guess != "generic":
                 analyzer_name, sniffed = guess, True
@@ -99,8 +92,6 @@ class ArgumentAnalyzer:
         analysis = route(call)
         analysis.tool_name = call.tool_name
 
-        # A specialised analyzer sees only its payload key; scan the rest of the
-        # arguments generically so nothing smuggled into a side field is missed.
         if analyzer_name in {"python", "shell", "sql"}:
             residual = self._residual_arguments(call, profile)
             if residual:
@@ -114,7 +105,6 @@ class ArgumentAnalyzer:
                 analysis.risk = max(analysis.risk, extra.risk)
 
         if sniffed:
-            # Dispatch by inference is weaker evidence than dispatch by registry.
             analysis.confidence = round(analysis.confidence * 0.9, 3)
         if oversize is not None:
             analysis.findings.append(oversize)
@@ -142,7 +132,6 @@ class ArgumentAnalyzer:
             return "path"
         return "generic"
 
-    # -- helpers --------------------------------------------------------
     def _oversize_finding(self, call: ToolInvocation) -> Finding | None:
         size = len(json.dumps(call.arguments, default=str).encode("utf-8", errors="ignore"))
         if size <= self.config.max_arguments_bytes:

@@ -29,7 +29,6 @@ from app.models.tool_call import ArgumentAnalysis, Finding, ResourceDescriptor
 
 ANALYZER = "shell"
 
-#: binary -> (capabilities, severity, description)
 BINARY_SEMANTICS: dict[str, tuple[list[Capability], Severity, str]] = {
     "rm": ([Capability.DELETE], Severity.HIGH, "removes files"),
     "rmdir": ([Capability.DELETE], Severity.MEDIUM, "removes directories"),
@@ -99,17 +98,11 @@ BINARY_SEMANTICS: dict[str, tuple[list[Capability], Severity, str]] = {
 INTERPRETERS = {"sh", "bash", "zsh", "python", "python3", "perl", "node", "ruby", "powershell"}
 DOWNLOADERS = {"curl", "wget"}
 FORK_BOMB_RE = re.compile(r":\s*\(\s*\)\s*\{.*\|.*&\s*\}\s*;\s*:")
-#: Segment boundaries. Command and process substitution (`$(...)`, `<(...)`,
-#: backticks) start a new command too: `bash -c "$(curl X)"` runs curl, and
-#: judging it as one `bash` segment hides the download.
 SPLIT_RE = re.compile(r"(\|\||&&|\||;|\n|\$\(|<\(|`|\))")
-#: `echo <base64> | base64 -d | sh` -- the literal is the command, so decode it
 B64_EXEC_RE = re.compile(
     r"\becho\s+['\"]?([A-Za-z0-9+/=]{12,})['\"]?\s*\|\s*base64\s+(?:-d|--decode)\s*\|\s*(?:ba|z)?sh\b"
 )
-#: an interpreter fed by command or process substitution
 SUBST_EXEC_RE = re.compile(r"\b(?:ba|z)?sh\b\s+(?:-c\s+)?['\"]?(?:\$\(|<\()")
-#: symbolic chmod modes that grant write or execute to everyone
 WORLD_MODE_RE = re.compile(r"^(?:a|o|ugo|go|uo)[+=][rwx]*[wx][rwx]*$")
 
 
@@ -166,13 +159,9 @@ def analyze_shell(command: str, _depth: int = 0) -> ArgumentAnalysis:
 
     for tokens in segments:
         binary = _basename(tokens[0])
-        # `sudo rm ...` should be judged on both binaries
         offset = 1 if binary in {"sudo", "doas", "env"} and len(tokens) > 1 else 0
         if offset:
             binaries.append(binary)
-            # The wrapper's only operand is the command it wraps; that command is
-            # judged on its own next. Passing the whole argv here would classify
-            # `/bin/chmod` as a system path the command touches.
             _apply_binary(binary, tokens[:1], findings, capabilities, resources)
             binary = _basename(tokens[1])
             tokens = tokens[1:]
@@ -181,9 +170,6 @@ def analyze_shell(command: str, _depth: int = 0) -> ArgumentAnalysis:
 
     _cross_segment_patterns(command, segments, binaries, findings, capabilities)
 
-    # A base64 literal decoded straight into a shell is a command written in a
-    # different alphabet. Decode it and judge what it says, as well as flagging
-    # the encoding itself.
     for encoded in B64_EXEC_RE.findall(command)[:2]:
         try:
             decoded = base64.b64decode(encoded, validate=True).decode("utf-8")
@@ -229,8 +215,6 @@ def _apply_binary(
 
     invoked = tokens[0]
     if semantics is None:
-        # An unrecognised binary invoked by path is the "run the thing we just
-        # downloaded" shape, so classify the artifact rather than shrugging.
         if "/" in invoked or "\\" in invoked or binary.endswith(tuple(EXECUTABLE_EXTENSIONS)):
             descriptor, path_findings = classify_path(invoked)
             resources.append(descriptor)

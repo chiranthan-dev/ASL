@@ -39,9 +39,7 @@ from app.models.tool_call import (
     utcnow,
 )
 
-#: capabilities that produce data another step could consume
 PRODUCING = {Capability.READ, Capability.DOWNLOAD, Capability.DATABASE, Capability.SENSOR_ACCESS}
-#: capabilities that consume data produced earlier
 CONSUMING = {
     Capability.EXECUTE, Capability.UPLOAD, Capability.EMAIL, Capability.WRITE,
     Capability.MODIFY, Capability.DELETE,
@@ -55,17 +53,14 @@ class BehaviorGraphBuilder:
     knowledge is carried forward by fingerprints, not by keeping graphs.
     """
 
-    #: how many sessions to keep resident before evicting the oldest
     MAX_RESIDENT_SESSIONS = 64
 
     def __init__(self, data_flow_window: int = 4, max_sessions: int | None = None) -> None:
-        # Ordered: insertion order is eviction order.
         self._graphs: OrderedDict[str, nx.MultiDiGraph] = OrderedDict()
         self._order: dict[str, list[str]] = {}
         self.data_flow_window = data_flow_window
         self.max_sessions = max_sessions or self.MAX_RESIDENT_SESSIONS
 
-    # -- accessors ------------------------------------------------------
     def graph(self, session_id: str) -> nx.MultiDiGraph:
         """Get (or create) a session's graph, evicting the oldest if needed.
 
@@ -101,7 +96,6 @@ class BehaviorGraphBuilder:
             self._graphs.pop(session_id, None)
             self._order.pop(session_id, None)
 
-    # -- construction ---------------------------------------------------
     def add_invocation(
         self,
         session_id: str,
@@ -117,9 +111,6 @@ class BehaviorGraphBuilder:
         graph = self.graph(session_id)
         order = self._order[session_id]
 
-        # `evidenced`, not `capabilities`: the graph is what the fingerprint is
-        # built from, and a fingerprint must describe the act rather than our
-        # guess about the tool that performed it.
         capabilities = list(capability_assessment.evidenced
                             or capability_assessment.capabilities)
         resources = list(argument_analysis.resources) if argument_analysis else []
@@ -181,7 +172,6 @@ class BehaviorGraphBuilder:
         order.append(node_id)
         return node_id
 
-    # -- data flow ------------------------------------------------------
     @staticmethod
     def _resource_node_id(resource: ResourceDescriptor) -> str | None:
         if resource.resource_class in (ResourceClass.NONE,):
@@ -224,7 +214,6 @@ class BehaviorGraphBuilder:
                 graph.add_edge(earlier, node_id, key=f"{EdgeType.DATA_FLOW.value}:inferred",
                                edge_type=EdgeType.DATA_FLOW.value, weight=0.5, inferred=True)
 
-    # -- views ----------------------------------------------------------
     def capability_sequence(self, session_id: str) -> list[list[Capability]]:
         graph = self.graph(session_id)
         return [

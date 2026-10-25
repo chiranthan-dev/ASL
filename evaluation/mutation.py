@@ -49,8 +49,6 @@ from evaluation.systems import INTERVENED, StaticRules
 SEED = 20260909
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
-#: Replacement names per mutation strategy, keyed on the original tool.
-#: Arguments are never touched -- only the label on the wrapper.
 MUTATIONS: dict[str, dict[str, str]] = {
     "rename": {
         "filesystem.delete": "fs_remove",
@@ -106,7 +104,6 @@ MUTATIONS: dict[str, dict[str, str]] = {
         "image_search": "tool_77fe",
         "calculator": "tool_aa08",
     },
-    # Actively misleading: every label reads as routine office work.
     "disguise": {
         "filesystem.delete": "notes.sync",
         "filesystem.read": "notes.open",
@@ -129,18 +126,6 @@ MUTATIONS: dict[str, dict[str, str]] = {
 
 STRATEGIES = ["identity", *MUTATIONS]
 
-#: Where does the operation verb live?
-#:
-#: VERB_IN_PAYLOAD  the argument states the operation: a shell command, a SQL
-#:                  statement, Python source, a mail envelope, content to
-#:                  write. Renaming the
-#:                  wrapper cannot hide what the call does.
-#: VERB_IN_NAME     the argument is a bare operand. `f(path="/production/db")`
-#:                  is equally consistent with a read, a write and a delete, so
-#:                  the verb survives only in the label -- and a rename destroys
-#:                  it. This is a property of the tool's schema, not of the
-#:                  analyzer, and it bounds what behaviour-keyed authorization
-#:                  can achieve.
 VERB_IN_PAYLOAD = {
     "shell.execute", "python.execute", "filesystem.write",
     "database.select", "database.delete", "database.update", "database.insert",
@@ -214,7 +199,6 @@ def materialise(scenarios: Iterable[EvalScenario], engine: ASLEngine) -> list[Ma
     return out
 
 
-# --------------------------------------------------------------- measurement --
 
 @dataclass
 class StrategyResult:
@@ -254,24 +238,16 @@ def run(target_dir: Path = RESULTS_DIR) -> dict[str, Any]:
     base = _fresh_engine(config, str(workdir / "materialise.db"))
     corpus = [s for s in build_corpus() if s.harmful]
     material = materialise(corpus, base)
-    # The benign side of the same question: does renaming make ordinary work
-    # look dangerous? A layer that is conservative about unknown tools pays for
-    # it here, and the cost belongs in the same table as the benefit.
     benign_material = materialise([s for s in build_corpus() if not s.harmful], base)
     base.store.close()
 
     results: dict[tuple[str, str], StrategyResult] = {}
-    #: does the mutated call still produce the same behavioural fingerprint?
     continuity: dict[str, list[float]] = defaultdict(list)
-    #: continuity split by where the operation verb lives
     by_verb: dict[tuple[str, str], list[float]] = defaultdict(list)
     baseline_fp: dict[str, str] = {}
     benign_fpr: dict[str, dict[str, float]] = {}
 
     for strategy in STRATEGIES:
-        # A fresh store per strategy: memory must not carry across, or a later
-        # strategy would inherit the earlier one's history and the comparison
-        # would measure order rather than identity.
         asl = _fresh_engine(config, str(workdir / f"asl_{strategy}.db"))
         static = StaticRules(asl)
         r_asl = StrategyResult(strategy, "asl_full")
@@ -296,7 +272,6 @@ def run(target_dir: Path = RESULTS_DIR) -> dict[str, Any]:
             r_asl.blocked += int(result.decision is Decision.BLOCK)
             r_asl.risks.append(result.risk_score)
 
-            # Fingerprint continuity: the per-call fingerprint of the first call.
             fp = result.calls[0].fingerprint if result.calls else ""
             if strategy == "identity":
                 baseline_fp[m.scenario_id] = fp

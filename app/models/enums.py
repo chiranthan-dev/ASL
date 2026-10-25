@@ -14,7 +14,7 @@ from enum import Enum
 class StrEnum(str, Enum):
     """`str` mixin enum so values serialise cleanly through Pydantic/JSON/SQLite."""
 
-    def __str__(self) -> str:  # pragma: no cover - trivial
+    def __str__(self) -> str:
         return str(self.value)
 
 
@@ -36,8 +36,6 @@ class Capability(StrEnum):
     SENSOR_ACCESS = "SENSOR_ACCESS"
 
 
-#: Relative destructive weight of a capability, 0-100.  Used by the capability
-#: extractor and (later) the risk engine; never used as a decision on its own.
 CAPABILITY_WEIGHT: dict[Capability, int] = {
     Capability.READ: 10,
     Capability.NETWORK: 25,
@@ -157,7 +155,6 @@ class ResourceClass(StrEnum):
     UNKNOWN = "UNKNOWN"
 
 
-#: Sensitivity multiplier hint per resource class (0-100).
 RESOURCE_SENSITIVITY: dict[ResourceClass, int] = {
     ResourceClass.NONE: 0,
     ResourceClass.PUBLIC_CONTENT: 5,
@@ -201,10 +198,10 @@ SCOPE_WEIGHT: dict[Scope, float] = {
 class EdgeType(StrEnum):
     """Relationship between two behavior-graph nodes."""
 
-    SEQUENCE = "SEQUENCE"        # b happened after a in the same session
-    DATA_FLOW = "DATA_FLOW"      # b consumes a resource a produced/touched
-    CAPABILITY = "CAPABILITY"    # invocation node -> capability node
-    RESOURCE = "RESOURCE"        # invocation node -> resource node
+    SEQUENCE = "SEQUENCE"
+    DATA_FLOW = "DATA_FLOW"
+    CAPABILITY = "CAPABILITY"
+    RESOURCE = "RESOURCE"
 
 
 class NodeKind(StrEnum):

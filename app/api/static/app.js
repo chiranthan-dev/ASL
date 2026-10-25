@@ -1,9 +1,3 @@
-/* ASL Inspector — animates one /evaluate trace, stage by stage.
- *
- * The backend returns an ordered list of TraceEvents; this file is a player for
- * that list. Nothing here re-derives a decision: every number shown comes from
- * the engine, so the animation and the audit log can never disagree.
- */
 
 const $ = (id) => document.getElementById(id);
 
@@ -55,7 +49,6 @@ const state = {
   graphDetail: null,
 };
 
-/* ─────────────────────────── boot ─────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
   renderExamples();
   refreshHealth();
@@ -104,9 +97,6 @@ async function loadConfig() {
   $("policy").textContent = `policy ${cfg.policy_version} · fusion ${cfg.fusion_strategy}`;
 }
 
-// Refreshes are triggered from several stages and can overlap; without a
-// sequence guard a slower earlier response can land last and render stale
-// counts (a run that just stored a fingerprint showing zero fingerprints).
 let healthSeq = 0;
 
 async function refreshHealth() {
@@ -123,7 +113,6 @@ async function refreshHealth() {
     <div class="stat"><b>${(a.mean_latency_ms || 0).toFixed(1)}ms</b><span>mean latency</span></div>`;
 }
 
-/* ─────────────────────────── run ─────────────────────────── */
 async function run(prompt) {
   prompt = (prompt || "").trim();
   if (!prompt) return;
@@ -177,7 +166,6 @@ async function resetAll() {
   refreshHealth(); loadStores();
 }
 
-/* ─────────────────────── flow rendering ─────────────────── */
 function buildFlow() {
   const flow = $("flow");
   flow.innerHTML = "";
@@ -271,13 +259,9 @@ function showStage(i) {
   if (ev.stage === "behavior_graph") drawGraph(ev.detail);
   if (ev.stage === "risk_engine") { renderRisk(state.result, ev.detail); }
   if (ev.stage === "decision") showDecision(ev.detail);
-  // Refresh the store panels once, at the end of the run. Refreshing mid-run
-  // as well raced the writes it was reporting on and could flash stale counts;
-  // the audit stage already shows the learning deltas in its own panel.
   if (ev.stage === "session") { refreshHealth(); loadStores(); }
 }
 
-/* ─────────────────── per-stage detail views ─────────────── */
 function renderDetail(ev) {
   const d = ev.detail || {};
   const body = (RENDERERS[ev.stage] || renderGeneric)(d, ev);
@@ -521,7 +505,6 @@ function renderGeneric(d, ev) {
   return `<div class="code">${escapeHtml(JSON.stringify(d, null, 1))}</div>`;
 }
 
-/* ───────────────────── risk + decision ──────────────────── */
 function showDecision(d) {
   const banner = $("decisionBanner");
   banner.className = `decision-banner ${d.decision} pulse`;
@@ -582,7 +565,6 @@ function gaugeSvg(risk) {
   </svg>`;
 }
 
-/* ───────────────────── behavior graph ───────────────────── */
 function drawGraph(detail) {
   state.graphDetail = detail;
   const nodes = (detail.nodes || []).filter((n) => n.kind !== "CAPABILITY");
@@ -632,7 +614,6 @@ function drawGraph(detail) {
   </svg>`;
 }
 
-/* ────────────────────── store panels ────────────────────── */
 let storesSeq = 0;
 
 async function loadStores() {
@@ -674,7 +655,6 @@ function selectTab(name) {
   if (name === "graph" && state.graphDetail) drawGraph(state.graphDetail);
 }
 
-/* ───────────────────────── helpers ──────────────────────── */
 function meter(label, value, max) {
   const pct = Math.max(2, Math.min(100, (value / max) * 100));
   const shown = max === 1 ? Number(value).toFixed(2) : Math.round(value);

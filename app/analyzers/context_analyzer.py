@@ -17,7 +17,6 @@ import re
 from app.models.context import AnalysisContext
 from app.models.enums import Capability
 
-#: prompt phrase -> capabilities a user asking that would reasonably expect
 PROMPT_EXPECTATIONS: tuple[tuple[str, set[Capability]], ...] = (
     (r"\b(search|look ?up|find|google|show me|what is|who is|picture|image|photo)\b",
      {Capability.READ, Capability.NETWORK}),

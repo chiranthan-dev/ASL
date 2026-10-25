@@ -51,8 +51,6 @@ def main(argv: list[str] | None = None) -> int:
         print(f"corpus: {corpus_summary['size']} scenarios "
               f"({corpus_summary['harmful']} harmful / {corpus_summary['benign']} benign)\n")
 
-    # ignore_cleanup_errors: SQLite may still hold the file briefly on Windows,
-    # and a temp-directory removal must never fail a completed evaluation.
     with tempfile.TemporaryDirectory(prefix="asl_eval_", ignore_cleanup_errors=True) as store_dir:
         config = load_config().with_overrides(database_path=f"{store_dir}/unused.db")
         systems = build_systems(config, store_dir)
@@ -87,8 +85,6 @@ def main(argv: list[str] | None = None) -> int:
 
     if verbose:
         print("\n" + markdown_table(all_metrics))
-        # ASCII only: the Windows console defaults to cp1252 and would raise on
-        # a Greek delta, failing an otherwise successful run at the last line.
         print(f"\nfingerprinting contribution: delta F1 {contribution['delta_f1']:+.3f}, "
               f"delta FPR {contribution['delta_fpr']:+.3f}, "
               f"fast path {contribution['fast_path_rate_gained']:+.1%}")

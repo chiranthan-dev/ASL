@@ -1,17 +1,10 @@
-# ASL - Adaptive Security Layer
-# Python 3.11+ required (3.12 recommended)
 
-fastapi>=0.110          # phase 13 API surface
-uvicorn[standard]>=0.27 # ASGI server for `python -m app.main --serve`
-pydantic>=2.6           # data models / validation
-networkx>=3.2           # behavior graphs, Weisfeiler-Lehman graph hashing
+fastapi>=0.110
+uvicorn[standard]>=0.27
+pydantic>=2.6
+networkx>=3.2
 
-# testing
 pytest>=8.0
 pytest-asyncio>=0.23
-httpx>=0.27             # FastAPI TestClient transport
+httpx>=0.27
 
-# NOTE: SQLite is used through the Python standard library (`sqlite3`);
-# no database driver dependency is required.
-# An OpenAI-compatible LLM adapter is optional and imported lazily; the mock
-# LLM has no third-party dependency, so ASL runs with no API key.

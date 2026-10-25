@@ -118,7 +118,6 @@ def analyze_generic(arguments: dict[str, Any], tool_name: str = "unknown") -> Ar
         resources=resources,
         findings=findings,
         risk=risk,
-        # generic inspection is weaker evidence than a real parser
         confidence=round(confidence_from(True, findings) * 0.75, 3),
         scope=scope,
         parse_ok=True,

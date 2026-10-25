@@ -28,7 +28,6 @@ def generator() -> FingerprintGenerator:
     return FingerprintGenerator()
 
 
-# ------------------------------------------------------------ determinism ----
 
 def test_fingerprints_are_deterministic() -> None:
     calls = [("filesystem.delete", {"path": "/production/database/", "recursive": True})]
@@ -56,7 +55,6 @@ def test_repeated_workflow_reuses_the_same_fingerprint() -> None:
     )
 
 
-# ------------------------------------------------------------- equivalence ----
 
 def test_equivalent_behaviour_across_different_tools_is_identical() -> None:
     registered = fingerprint_for(
@@ -91,7 +89,6 @@ def test_same_tool_different_arguments_fingerprint_differently() -> None:
     assert dangerous.max_scope is Scope.RECURSIVE
 
 
-# ------------------------------------------------------------------ chains ----
 
 def test_chain_fingerprint_captures_transitions() -> None:
     chain = fingerprint_for(
@@ -131,7 +128,6 @@ def test_novelty_is_the_complement_of_similarity(generator: FingerprintGenerator
     assert generator.novelty(0.75) == pytest.approx(0.25)
 
 
-# ------------------------------------------------------- similarity helpers ----
 
 def test_step_similarity_gives_partial_credit() -> None:
     a = "CAPS[DELETE]@RES[PRODUCTION_RESOURCE:RECURSIVE]"
@@ -139,8 +135,6 @@ def test_step_similarity_gives_partial_credit() -> None:
     c = "CAPS[READ]@RES[PUBLIC_CONTENT:SINGLE]"
     assert step_similarity(a, a) == 1.0
     assert 0.5 < step_similarity(a, b) < 1.0
-    # different action against a far less sensitive resource: near zero, and
-    # graded rather than exactly zero so nearest-neighbour search stays ordered
     assert step_similarity(a, c) < 0.1
 
 

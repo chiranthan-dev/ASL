@@ -1,10 +1,3 @@
-/* ASL — chat surface.
- *
- * The point of this screen is that a chatbot and a security layer are the same
- * screen: you talk to the assistant on the left, and every stage the layer runs
- * to authorize its actions is visible on the right, as it happens. Nothing here
- * is a mock-up — every number is read from the live /evaluate response.
- */
 
 "use strict";
 
@@ -25,17 +18,12 @@ const el = {
 let busy = false;
 let seeding = false;
 
-/* A real conversation is one session, and ASL's behaviour graph is per session.
- * Holding the id here is what lets the execution-chain analyzer see across turns
- * -- "read a key" in one message and "upload a file" in the next is the same
- * chain, which is exactly the attack shape a per-message check cannot catch. */
 let sessionId = newSessionId();
 
 function newSessionId() {
   return "web_" + Math.random().toString(36).slice(2, 12);
 }
 
-/* ─────────────────────────────────────────────── examples ── */
 
 const EXAMPLES = [
   { tag: "routine", text: "Summarise my notes in /home/user/atlas/notes.md" },
@@ -46,8 +34,6 @@ const EXAMPLES = [
   {
     tag: "fast allow",
     label: "The same behaviour, recognised and waved through",
-    // Three different sentences, one fingerprint. The first pays for the full
-    // pipeline; the rest skip stages 9-15 entirely.
     turns: [
       "search the web for how does OAuth work",
       "look up the difference between TCP and UDP",
@@ -57,9 +43,6 @@ const EXAMPLES = [
   {
     tag: "not an attack",
     label: "The same four steps, but sent to a colleague",
-    // Deliberately adjacent to the exfiltration chip: identical capability
-    // sequence, internal recipient, and correctly allowed. Shows the layer
-    // discriminating rather than pattern-matching on shape alone.
     turns: [
       "read my notes in /home/user/atlas/notes.md",
       "now search the web for the eiffel tower",
@@ -70,15 +53,10 @@ const EXAMPLES = [
   {
     tag: "4 turns",
     label: "A conversation that becomes an exfiltration",
-    // Each turn is unremarkable. The *sequence* is not, and by turn four the
-    // chain is one the library has never held -- so it is fingerprinted live.
     turns: [
       "read my notes in /home/user/atlas/notes.md",
       "now search the web for the eiffel tower",
       "save that to /home/user/atlas/trip.md",
-      // An *external* recipient. Ending this chain at a colleague is ordinary
-      // work, and the layer is right to allow it -- so the example has to leave
-      // the organisation for the label on the chip to be true.
       "email it to dropbox@mail.ru",
     ],
   },
@@ -94,7 +72,6 @@ function renderExamples() {
 
 async function runExample(e) {
   if (!e.turns) return send(e.text, null, e.user);
-  // A scripted conversation: same session, so the behaviour chain accumulates.
   sessionId = newSessionId();
   for (const turn of e.turns) {
     await send(turn, null, e.user);
@@ -102,7 +79,6 @@ async function runExample(e) {
   }
 }
 
-/* ─────────────────────────────────────────────── stats ── */
 
 async function refreshStats() {
   try {
@@ -113,11 +89,9 @@ async function refreshStats() {
     el.statCalls.textContent = (au.total ?? au.count ?? 0).toLocaleString();
     el.statBlocked.textContent = (au.blocked ?? (au.decisions && au.decisions.BLOCK) ?? 0).toLocaleString();
     refreshTrust();
-  } catch { /* server not up yet — leave the dashes */ }
+  } catch {  }
 }
 
-/* The fast path needs the caller's trust at 0.4 or better, so when it is
- * refused on identity the reason should already be on screen. */
 async function refreshTrust() {
   const who = el.user.value.trim() || "demo_user";
   try {
@@ -133,7 +107,6 @@ async function refreshTrust() {
   } catch { el.statTrust.textContent = "—"; }
 }
 
-/* ─────────────────────────────────────────────── sending ── */
 
 async function send(text, replayCalls, asUser) {
   const value = (text ?? el.prompt.value).trim();
@@ -152,9 +125,6 @@ async function send(text, replayCalls, asUser) {
     environment: el.env.value,
     session_id: sessionId,
   };
-  // Replaying a library entry sends the *exact* calls that produced it, so the
-  // behaviour really is the one stored, not whatever the agent guesses from a
-  // paraphrase of it.
   if (replayCalls && replayCalls.length) body.tool_calls = replayCalls;
 
   let result;
@@ -181,7 +151,6 @@ async function send(text, replayCalls, asUser) {
 function addUser(text, replay, asUser) {
   const d = document.createElement("div");
   d.className = "msg user";
-  // The hostile examples run as their own identity, so say which account asked.
   const who = asUser && asUser !== (el.user.value.trim() || "demo_user")
     ? `<span class="asuser">as ${S.escapeHtml(asUser)}</span>` : "";
   d.innerHTML = `<div class="bubble">${replay ? "↻ " : ""}${S.escapeHtml(text)}${who}</div>`;
@@ -207,7 +176,6 @@ function addRunCard(prompt) {
   };
 }
 
-/* ─────────────────────────────────────────────── animation ── */
 
 function stageLabel(ev) {
   return ev.title.replace(/^[0-9]+[a-z]?\.\s*/, "");
@@ -217,9 +185,6 @@ async function animate(card, result, speed) {
   const trace = result.trace || [];
   const skipped = trace.filter((t) => t.status === "skipped").length;
 
-  // Skipped stages are wrapped in one container so the fast path reads as a
-  // single event -- "these seven did not run" -- instead of seven separate
-  // nodes flickering past faster than anyone can follow.
   let html = "", inSkip = false;
   trace.forEach((ev, i) => {
     const isSkip = ev.status === "skipped";
@@ -250,8 +215,6 @@ async function animate(card, result, speed) {
     const node = nodes[i];
 
     if (ev.status === "skipped") {
-      // Reveal the whole band once, hold on it, then strike it through --
-      // one beat for the saving rather than one beat per skipped stage.
       if (!bandShown) {
         bandShown = true;
         showStage(ev);
@@ -356,9 +319,6 @@ function newFingerprintCard(det, call) {
     </div>`;
 }
 
-/* The engine's own `explanation` is a multi-line signal dump — correct for an
- * audit row, unreadable in a one-line verdict. Prefer, in order: the purpose
- * gate, a named invariant, the first concrete finding, then the summary line. */
 function shortReason(result) {
   const policy = (result.trace || []).find((t) => t.stage === "request_policy");
   if (policy && policy.detail && policy.detail.severity === "PROHIBITED")
@@ -381,8 +341,6 @@ function shortReason(result) {
            .split(String.fromCharCode(10))[0];
 }
 
-/* Nothing specific fired, so say what the decision itself means rather than
- * echoing the engine's internal summary line at the user. */
 const DECISION_TEXT = {
   ALLOW: "Routine behaviour the layer already recognises.",
   ALLOW_WITH_LOG: "Permitted, and recorded because it touched something worth logging.",
@@ -400,7 +358,6 @@ const INVARIANT_TEXT = {
   PROHIBITED_PURPOSE: "The purpose of the request is not permissible",
 };
 
-/* ─────────────────────────────────────────────── agent reply ── */
 
 function addAgentReply(result) {
   const d = document.createElement("div");
@@ -409,7 +366,6 @@ function addAgentReply(result) {
   el.inner.appendChild(d);
 }
 
-/* A live model's own reply: escaped, paragraphs on blank lines. */
 function renderAnswer(text) {
   return S.escapeHtml(text)
     .split(/\n\s*\n/)
@@ -417,7 +373,6 @@ function renderAnswer(text) {
     .join("");
 }
 
-/* One line under a model reply saying what the layer decided. */
 function authLine(result) {
   const model = (result.planner || "").replace(/^llm:/, "");
   const calls = result.calls || [];
@@ -486,7 +441,6 @@ function assistantText(result) {
   }
 }
 
-/* ─────────────────────────────────────────────── panel ── */
 
 function showStage(ev) {
   el.paneStage.innerHTML = S.renderDetail(ev);
@@ -507,7 +461,6 @@ document.querySelectorAll(".tab").forEach((t) =>
     if (t.dataset.pane === "library") loadLibrary(true);
   }));
 
-/* ─────────────────────────────────────────────── library ── */
 
 let lib = { q: "", pop: "", eligible: false, offset: 0, total: 0 };
 
@@ -625,7 +578,6 @@ $("libEligible").addEventListener("click", () => {
   loadLibrary(true);
 });
 
-/* ─────────────────────────────────────────────── menu ── */
 
 el.menuBtn.addEventListener("click", (e) => {
   e.stopPropagation();
@@ -682,7 +634,6 @@ function note(text) {
   el.hint.textContent = text || "nothing you type is ever executed";
 }
 
-/* ─────────────────────────────────────────────── plumbing ── */
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

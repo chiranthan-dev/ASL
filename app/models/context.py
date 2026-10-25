@@ -31,9 +31,6 @@ class SessionHistory:
     risk_scores: list[float] = field(default_factory=list)
     decisions: list[str] = field(default_factory=list)
     tools: list[str] = field(default_factory=list)
-    #: every resource class the session has touched so far. A chain analyzer that
-    #: only sees capabilities cannot tell "read notes, then mail them" from
-    #: "read a private key, then mail it" -- both are READ followed by EMAIL.
     resource_classes: list[str] = field(default_factory=list)
     started_at: float = 0.0
 

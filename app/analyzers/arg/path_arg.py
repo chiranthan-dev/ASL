@@ -23,21 +23,15 @@ from app.models.tool_call import ArgumentAnalysis, Finding
 
 ANALYZER = "path"
 
-#: operation -> (capabilities, base risk, severity floor for sensitive targets)
 OPERATION_SEMANTICS: dict[str, tuple[list[Capability], float, Severity]] = {
     "read": ([Capability.READ], 12.0, Severity.MEDIUM),
     "write": ([Capability.WRITE, Capability.MODIFY], 28.0, Severity.HIGH),
     "delete": ([Capability.DELETE], 42.0, Severity.CRITICAL),
     "list": ([Capability.READ], 8.0, Severity.LOW),
-    # The tool's name states no operation and the payload carries only an
-    # operand. Identity stays a read -- that is all the evidence shows -- but
-    # risk is scored as if the operation could be the worst one, because
-    # opacity must raise risk rather than lower it.
     "unstated": ([Capability.READ], 24.0, Severity.CRITICAL),
 }
 
 
-#: verb tokens that map onto a filesystem operation, most destructive first
 OPERATION_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("delete", ("delete", "remove", "unlink", "purge", "destroy", "wipe", "rm")),
     ("write", ("write", "save", "create", "append", "put", "upload", "copy", "move")),
@@ -46,7 +40,6 @@ OPERATION_TOKENS: tuple[tuple[str, tuple[str, ...]], ...] = (
 )
 
 
-#: files the system runs on its own: login shells, schedulers, service units
 PERSISTENCE_RE = re.compile(
     r"(^|/)\.(bashrc|bash_profile|bash_login|profile|zshrc|zprofile|zshenv)$|"
     r"(^|/)(crontab|rc\.local)$|^/etc/cron|^/var/spool/cron|/systemd/.+\.(service|timer)$|"
@@ -99,7 +92,6 @@ def analyze_path(arguments: dict[str, Any], tool_name: str = "filesystem.read") 
             message="no path supplied; target unknown",
         ))
 
-    # A sensitive or wide target turns an ordinary operation into a serious one.
     if descriptor.sensitive:
         findings.append(Finding(
             code=f"PATH_SENSITIVE_{operation.upper()}", severity=sensitive_floor, analyzer=ANALYZER,
@@ -142,9 +134,6 @@ def analyze_path(arguments: dict[str, Any], tool_name: str = "filesystem.read") 
                 message="writes a file the system executes automatically (startup, cron or login)",
                 evidence=raw_path, capabilities=[Capability.EXECUTE],
             ))
-        # Content written to a script or a startup file is code that will run
-        # later, so judge it now as the code it is. Without this, `.bashrc`
-        # containing `curl ... | bash` was an ordinary text write.
         if content.strip() and (persistent or descriptor.resource_class in (ResourceClass.BINARY, ResourceClass.CODE)):
             nested = _analyze_written_code(content, descriptor.identifier or "")
             if nested is not None:

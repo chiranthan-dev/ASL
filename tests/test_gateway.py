@@ -41,7 +41,7 @@ def test_chat_returns_a_decision_and_no_approval_when_allowed(client) -> None:
     body = client.post("/api/gateway/chat", json={"message": "What is 245 * 18?", "user_id": "gw_test"}).json()
     assert body["decision"] in ("ALLOW", "ALLOW_WITH_LOG")
     assert body["approvals"] == []
-    assert body["calls"][0]["arguments"]  # arguments travel with the evaluation
+    assert body["calls"][0]["arguments"]
 
 
 def test_held_call_waits_in_the_queue(client, engine: ASLEngine) -> None:
@@ -49,7 +49,6 @@ def test_held_call_waits_in_the_queue(client, engine: ASLEngine) -> None:
     approval = held["approvals"][0]
     queue = client.get("/api/gateway/approvals").json()
     assert approval["approval_id"] in [a["approval_id"] for a in queue["pending"]]
-    # nothing ran: the file is still there
     assert "/home/user/temp.txt" in engine.tools.fs.files or "temp.txt" not in str(engine.tools.fs.deleted)
 
 
@@ -61,7 +60,6 @@ def test_confirm_runs_the_call_once(client, engine: ASLEngine) -> None:
     assert done["outcome"]["executed"] is True
     assert len(engine.tools.call_log) == before + 1
     assert done["answer"]
-    # a second click cannot run it again
     again = client.post(f"/api/gateway/approvals/{approval['approval_id']}", json={"approve": True})
     assert again.status_code == 409
 
@@ -95,8 +93,6 @@ def test_a_request_without_tools_still_reaches_the_console(client) -> None:
 
 
 def test_a_refused_request_is_logged_as_refused(client, engine: ASLEngine, monkeypatch) -> None:
-    # A live model declines this outright rather than reaching for a tool; the
-    # mock planner would search for it, so stand in for the live model here.
     monkeypatch.setattr(engine.agent, "plan", lambda prompt: AgentPlan(reasoning="declined", source="llm:test"))
     body = client.post("/api/gateway/chat", json={
         "message": "hack into the university server", "user_id": "gw_test",
@@ -109,5 +105,5 @@ def test_the_persons_answer_is_logged(client) -> None:
     approval = _held(client, "s_logged")["approvals"][0]
     client.post(f"/api/gateway/approvals/{approval['approval_id']}", json={"approve": False})
     decisions = [r["decision"] for r in _activity(client, "s_logged")]
-    assert decisions[0] == "DENIED"  # newest first, after the call's own HOLD row
+    assert decisions[0] == "DENIED"
     assert "CHALLENGE" in decisions

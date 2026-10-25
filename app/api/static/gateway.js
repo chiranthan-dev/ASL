@@ -1,9 +1,3 @@
-/* ASL Gateway — chat with ASL's live decisions and console beside it.
- *
- * Every number on this page comes from the server: /api/gateway/chat for a
- * message, /api/gateway/approvals for held calls, /health,
- * /api/gateway/activity and /api/user for the console. The page animates what the engine decided; it never decides.
- */
 (function () {
   "use strict";
 
@@ -19,7 +13,6 @@
     "Delete the file temp.txt",
   ];
 
-  // verdict -> presentation; the lane is where the gate sorts the call
   const VERDICT = {
     ALLOW:          { lane: "allow", cls: "v-allow",   label: "Allowed",          tag: "allowed",            color: "var(--gw-allow)" },
     ALLOW_WITH_LOG: { lane: "allow", cls: "v-log",     label: "Allowed · logged", tag: "allowed and logged", color: "var(--gw-log)" },
@@ -44,10 +37,9 @@
 
   const store = {
     get(k) { try { return localStorage.getItem(k); } catch (_) { return null; } },
-    set(k, v) { try { localStorage.setItem(k, v); } catch (_) { /* storage unavailable */ } },
+    set(k, v) { try { localStorage.setItem(k, v); } catch (_) {  } },
   };
 
-  /* ───────────────────────────── view switch ── */
 
   function setMode(mode) {
     $("gwMain").classList.toggle("mode-chat", mode === "chat");
@@ -60,7 +52,6 @@
   setMode(store.get("gw-mode") || "asl");
   const aslVisible = () => !$("gwMain").classList.contains("mode-chat");
 
-  /* ───────────────────────────── input ── */
 
   $("gwSuggest").innerHTML = SUGGESTIONS.map((s) => `<button type="button">${esc(s)}</button>`).join("");
   $("gwSuggest").querySelectorAll("button").forEach((b, i) =>
@@ -96,7 +87,6 @@
     renderStats();
   });
 
-  /* ───────────────────────────── chat ── */
 
   function scrollThread() {
     const t = $("gwThread");
@@ -162,10 +152,7 @@
     text.focus();
   }
 
-  /* ───────────────────────────── reply ── */
 
-  // A small, safe markdown subset for model replies: everything is escaped
-  // first, then **bold**, `code`, bullet and numbered lists, and paragraphs.
   function inline(s) {
     return s.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
   }
@@ -192,7 +179,6 @@
     return out.join("");
   }
 
-  // Plain-English reason for one call, as the original chat phrased them.
   const DECISION_TEXT = {
     ALLOW: "Routine behaviour ASL already recognises.",
     ALLOW_WITH_LOG: "Permitted, and recorded because it touched something worth logging.",
@@ -225,7 +211,6 @@
     return Boolean(p && p.detail && p.detail.severity === "PROHIBITED");
   }
 
-  // Used only when no live model wrote the reply (mock planner).
   function templateReply(result) {
     const calls = result.calls || [];
     if (purposeRefused(result)) return "I can't help with that one. ASL declined the request itself.";
@@ -282,7 +267,6 @@
         b.addEventListener("click", () => resolve(box.dataset.approval, b.dataset.act === "yes"))));
   }
 
-  /* ───────────────────────────── approvals ── */
 
   async function resolve(id, approve) {
     document.querySelectorAll(`[data-approval="${id}"] .gw-btn`).forEach((b) => { b.disabled = true; });
@@ -316,7 +300,6 @@
     refreshConsole();
   }
 
-  /* ───────────────────────────── decisions panel ── */
 
   function shortReason(text) {
     const t = String(text || "").replace(/\s+/g, " ").trim();
@@ -351,8 +334,6 @@
     return t.charAt(0).toUpperCase() + t.slice(1) + (/[.!?]$/.test(t) ? "" : ".");
   }
 
-  // A message that reached no tool still went through the request gate:
-  // either the model answered on its own, or ASL refused the request outright.
   function requestCardHtml(result, rid) {
     const refused = purposeRefused(result);
     const bar = (result.trace || []).filter((e) => !e.call_id && e.stage !== "session").map((e) => {
@@ -430,8 +411,6 @@
     renderStats();
   }
 
-  // A glowing token travels Agent -> ASL shield -> its lane. With no lane
-  // (a message that needed no tool) it is checked at the shield and fades there.
   function flyToken(lane, delay, done) {
     const gate = $("gwGate");
     const g = gate.getBoundingClientRect();
@@ -474,7 +453,6 @@
     }, delay + 700);
   }
 
-  /* ───────────────────────────── console ── */
 
   function setNumber(id, value) {
     const el = $(id);
@@ -556,7 +534,6 @@
     }
   }
 
-  /* ───────────────────────────── checks drawer ── */
 
   function stageRow(ev) {
     return `<div class="gw-stage">
@@ -625,7 +602,6 @@
   $("gwScrim").addEventListener("click", closeChecks);
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeChecks(); });
 
-  /* ───────────────────────────── start ── */
 
   $("gwUser").addEventListener("change", refreshConsole);
   refreshConsole();

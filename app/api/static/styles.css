@@ -1,9 +1,3 @@
-/* ASL — light monochrome.
- *
- * One rule governs the palette: the interface is greyscale, and colour is spent
- * only on the four verdicts. If everything is coloured, nothing reads as the
- * answer. Fonts are system stacks so the demo works with no network.
- */
 
 :root {
   --bg:        #ffffff;
@@ -17,7 +11,6 @@
   --ink-soft:  #767d85;
   --ink-faint: #a3a9b0;
 
-  /* the only colours in the product */
   --allow:     #17794a;
   --allow-bg:  #e8f4ee;
   --challenge: #9a6207;
@@ -55,7 +48,6 @@ button, input, select, textarea { font: inherit; color: inherit; }
 h1, h2, h3, h4 { margin: 0; font-weight: 600; letter-spacing: -.01em; }
 code, .mono { font-family: var(--mono); font-size: .88em; }
 
-/* ───────────────────────────────────────────────── app shell ── */
 .app {
   display: grid;
   grid-template-rows: auto 1fr;
@@ -118,7 +110,6 @@ code, .mono { font-family: var(--mono); font-size: .88em; }
 }
 .field input { width: 110px; }
 
-/* menu */
 .menu-wrap { position: relative; }
 .menu {
   position: absolute; right: 0; top: calc(100% + 6px);
@@ -140,7 +131,6 @@ code, .mono { font-family: var(--mono); font-size: .88em; }
 .menu .sub { display: block; font-size: 11.5px; color: var(--ink-soft); margin-top: 1px; }
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 6px 4px; }
 
-/* ───────────────────────────────────────────────── layout ── */
 .main {
   display: grid;
   grid-template-columns: minmax(420px, 1fr) minmax(430px, 560px);
@@ -154,7 +144,6 @@ code, .mono { font-family: var(--mono); font-size: .88em; }
   background: var(--bg); border-left: 1px solid var(--line);
 }
 
-/* ───────────────────────────────────────────────── thread ── */
 .thread { flex: 1; overflow-y: auto; padding: 22px 24px 8px; }
 .thread-inner { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
@@ -194,7 +183,6 @@ code, .mono { font-family: var(--mono); font-size: .88em; }
   color: var(--ink-faint); margin-right: 6px;
 }
 
-/* ───────────────────────────────────────────────── run card ── */
 .run {
   background: var(--bg);
   border: 1px solid var(--line);
@@ -270,7 +258,6 @@ code, .mono { font-family: var(--mono); font-size: .88em; }
 .flag.new { color: var(--new); border-color: var(--new); background: var(--new-bg); font-weight: 600; }
 .flag.fast { color: var(--allow); border-color: var(--allow); background: var(--allow-bg); }
 
-/* the "new fingerprint" moment */
 .newfp {
   margin: 0 14px 12px; padding: 11px 13px;
   border: 1px solid var(--new); border-left: 3px solid var(--new);
@@ -285,7 +272,6 @@ code, .mono { font-family: var(--mono); font-size: .88em; }
 }
 .newfp p { margin: 0; font-size: 12.5px; color: var(--ink-mid); }
 
-/* ───────────────────────────────────────────────── composer ── */
 .composer {
   border-top: 1px solid var(--line); background: var(--bg);
   padding: 12px 24px 14px;
@@ -310,7 +296,6 @@ code, .mono { font-family: var(--mono); font-size: .88em; }
 .speed { display: flex; align-items: center; gap: 6px; }
 .speed input { width: 78px; accent-color: var(--ink); }
 
-/* ───────────────────────────────────────────────── right panel ── */
 .panel-head {
   position: sticky; top: 0; z-index: 5;
   display: flex; align-items: center; justify-content: space-between;
@@ -329,7 +314,6 @@ code, .mono { font-family: var(--mono); font-size: .88em; }
 
 .empty { color: var(--ink-faint); font-size: 13.5px; padding: 30px 6px; text-align: center; }
 
-/* stage detail */
 .dhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 4px; }
 .dhead h4 { font-size: 14.5px; }
 .dsum { font-size: 13px; color: var(--ink-mid); margin-bottom: 12px; }
@@ -391,7 +375,6 @@ h3 { font-size: 12.5px; color: var(--ink-soft); text-transform: uppercase;
 .gedge.DATA_FLOW { stroke: var(--challenge); stroke-dasharray: 4 3; }
 .gedge.TOUCHES { stroke: var(--ink-faint); stroke-dasharray: 1.5 3; }
 
-/* ───────────────────────────────────────────────── library ── */
 .lib-tools { display: flex; gap: 7px; margin-bottom: 12px; flex-wrap: wrap; }
 .lib-tools input[type=search] {
   flex: 1; min-width: 150px;
@@ -445,10 +428,6 @@ h3 { font-size: 12.5px; color: var(--ink-soft); text-transform: uppercase;
   .main.showpanel .right { display: block; border-left: 0; }
 }
 
-/* ─────────────────────────────────────────────────────────────────
- * Inspector (/inspector) — the raw-trace surface, kept for debugging
- * and reachable from the settings menu. Same palette, denser layout.
- * ───────────────────────────────────────────────────────────────── */
 
 body.inspector { background: var(--bg-sunk); overflow: auto; }
 
@@ -533,10 +512,6 @@ body.inspector { background: var(--bg-sunk); overflow: auto; }
 @media (max-width: 980px) { .layout { grid-template-columns: 1fr; } }
 
 
-/* ── the fast path, made visible ───────────────────────────────────────────
- * The stages the fast path skips are the point of the mechanism, so they are
- * drawn as one struck-through band rather than as individual nodes that tick
- * past too quickly to register. */
 .skipband {
   display: inline-flex; align-items: center; flex-wrap: wrap; gap: 5px;
   position: relative;
@@ -557,7 +532,6 @@ body.inspector { background: var(--bg-sunk); overflow: auto; }
 }
 .skipband.live .skipband-label { color: var(--allow); }
 .skipband.struck { opacity: .78; }
-/* the band already carries the meaning; do not dim the labels away too */
 .skipband .node.skip { opacity: .85; color: var(--ink-soft); }
 .skipband.struck::after {
   content: ""; position: absolute; left: 8px; right: 8px; top: 58%;

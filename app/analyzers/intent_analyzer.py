@@ -16,7 +16,6 @@ import re
 from app.models.context import AnalysisContext
 from app.models.enums import Capability, Intent, ResourceClass, Scope
 
-#: intent -> (base risk, one-line rationale)
 INTENT_RISK: dict[Intent, tuple[float, str]] = {
     Intent.PRIVILEGE_ESCALATION: (95.0, "changes who is allowed to do what"),
     Intent.DATA_EXFILTRATION: (94.0, "moves data out of the trust boundary"),
@@ -30,7 +29,6 @@ INTENT_RISK: dict[Intent, tuple[float, str]] = {
     Intent.UNKNOWN: (55.0, "purpose could not be established, which is itself a risk"),
 }
 
-#: prompt phrases that corroborate a hostile intent (never sufficient alone)
 PROMPT_SIGNALS: tuple[tuple[str, Intent], ...] = (
     (r"\b(exfiltrat|leak|steal|smuggle|siphon)\w*", Intent.DATA_EXFILTRATION),
     (r"\b(wipe|destroy|nuke|erase everything|delete all|drop (the )?(database|table))\b", Intent.DESTRUCTIVE_ACTION),
@@ -46,8 +44,6 @@ INJECTION_MARKERS = re.compile(
 )
 
 
-#: Resource classes whose contents should not be forwarded at all, wherever the
-#: destination sits. Mirrors execution_chain.SENSITIVE_SOURCES.
 SENSITIVE_SESSION_CLASSES = {
     ResourceClass.CREDENTIAL_STORE.value, ResourceClass.PRODUCTION_RESOURCE.value,
     ResourceClass.SENSITIVE_TABLE.value, ResourceClass.SYSTEM_PATH.value,
@@ -71,8 +67,6 @@ class IntentAnalyzer:
         risk = base * self._target_scale(intent, context, evidence)
         confidence = 0.85 if evidence else 0.5
 
-        # The prompt can only *corroborate*. Agreement raises confidence;
-        # disagreement never lowers the risk, it lowers confidence.
         prompt_intent = self._prompt_intent(context.prompt)
         if prompt_intent is not None:
             if prompt_intent is intent:
@@ -100,7 +94,6 @@ class IntentAnalyzer:
             explanation += " — " + "; ".join(evidence[:3])
         return intent, round(risk, 2), round(confidence, 3), explanation
 
-    #: intents whose danger depends heavily on what they are aimed at
     TARGET_SENSITIVE = {
         Intent.COMMUNICATION, Intent.FILE_MANAGEMENT, Intent.DATA_PROCESSING,
         Intent.DATA_TRANSFER, Intent.INFORMATION_RETRIEVAL,
@@ -125,7 +118,6 @@ class IntentAnalyzer:
         evidence.append("aimed at an ordinary, single, non-sensitive target")
         return 0.55
 
-    # -- classification ---------------------------------------------------
     def _classify(
         self,
         caps: set[Capability],
@@ -141,10 +133,6 @@ class IntentAnalyzer:
             return Intent.PRIVILEGE_ESCALATION, ["call changes permissions, ownership or identity"]
 
         sending = caps & {Capability.UPLOAD, Capability.EMAIL}
-        # "Reads and sends in one call" must rest on evidence for both halves. An
-        # unregistered tool's name yields a guessed READ, and pairing that guess
-        # with an evidenced EMAIL made every renamed mailer look like
-        # exfiltration: an internal note to a lab partner scored 94 here.
         evidenced = context.evidenced_set
         reading = evidenced & {Capability.READ, Capability.DATABASE, Capability.SENSOR_ACCESS}
         if reading and sending & evidenced:
@@ -153,18 +141,8 @@ class IntentAnalyzer:
             ResourceClass.EXTERNAL_ENDPOINT in resources or ResourceClass.EMAIL_RECIPIENT_EXTERNAL in resources
         ) and (sensitive or "HTTP_EXFILTRATION_SHAPE" in codes or "EMAIL_EXTERNAL_ATTACHMENT" in codes):
             return Intent.DATA_EXFILTRATION, ["sensitive material is leaving for an external destination"]
-        # The cross-step form of exfiltration: an earlier step read data and
-        # *this* step sends it outward. The current call must be the sender.
-        # Checking only that the session contains an outward capability somewhere
-        # made every later read in that session read as exfiltration -- after one
-        # blocked attempt, asking for the capital of France scored 94 here, and
-        # because intent is a dominance signal that pinned the whole decision.
         if sending and (chain_caps & {Capability.READ, Capability.DATABASE}) \
                 and len(context.chain_fingerprint.steps) > 1:
-            # Sending is not exfiltration on its own. It qualifies when the
-            # destination is outside the organisation, or when what was read
-            # earlier in the session should not be forwarded anywhere. Reading
-            # your own notes and mailing them to a colleague is ordinary work.
             outward = (ResourceClass.EXTERNAL_ENDPOINT in resources
                        or ResourceClass.EMAIL_RECIPIENT_EXTERNAL in resources)
             carried_sensitive = bool(

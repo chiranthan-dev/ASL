@@ -49,11 +49,10 @@ from app.models.enums import StrEnum
 
 class PolicySeverity(StrEnum):
     NONE = "NONE"
-    RESTRICTED = "RESTRICTED"      # plausible legitimate reading: require a human
-    PROHIBITED = "PROHIBITED"      # no legitimate reading in this context: refuse
+    RESTRICTED = "RESTRICTED"
+    PROHIBITED = "PROHIBITED"
 
 
-#: severity -> risk contributed by the request itself
 SEVERITY_RISK: dict[PolicySeverity, float] = {
     PolicySeverity.NONE: 0.0,
     PolicySeverity.RESTRICTED: 62.0,
@@ -99,12 +98,9 @@ class PolicyAssessment:
         }
 
 
-# ---------------------------------------------------------------- patterns ----
-# (category, severity, pattern, why)
 Rule = tuple[str, PolicySeverity, str, str]
 
 RULES: tuple[Rule, ...] = (
-    # -- intrusion -----------------------------------------------------
     ("UNAUTHORIZED_ACCESS", PolicySeverity.PROHIBITED,
      r"\bhack(ing|ed)?\s+(in)?to\b|\bhack\s+(a|the|this|that|my\s+\w+'?s?)\s*\w*\s*(server|system|account|network|site|website|database|pc|computer|wifi)\b",
      "requests intrusion into a system"),
@@ -130,16 +126,12 @@ RULES: tuple[Rule, ...] = (
      r"\b(ddos|denial[\s-]of[\s-]service)\b.{0,20}\b(attack|them|the\s+\w+)\b|\blaunch\s+a\s+ddos\b|\bdeface\b",
      "requests a disruptive attack"),
 
-    # -- surveillance of third parties ---------------------------------
     ("SURVEILLANCE", PolicySeverity.PROHIBITED,
      r"\b(get|read|access|retrieve|fetch|see|check|show|pull|copy|extract)\b.{0,45}"
      r"\b(messages?|emails?|mails?|chats?|texts?|dms?|conversations?|files?|photos?|documents?|browsing\s+history|screen)\b"
      r".{0,45}\b(colleague|coworker|co-worker|classmate|employee|friend|wife|husband|partner|girlfriend|boyfriend|"
      r"ex|neighbou?r|someone\s+else|other\s+people|another\s+(person|user)|their|his|her|thier)\b",
      "requests another person's private content"),
-    # The same request with the words the other way round: "read my coworker's
-    # emails". Here the third party is named explicitly rather than by a bare
-    # pronoun, because "check their files" is too often innocent to refuse.
     ("SURVEILLANCE", PolicySeverity.PROHIBITED,
      r"\b(get|read|access|retrieve|fetch|see|check|show|pull|copy|extract|open|look\s+at)\b.{0,25}"
      r"\b(colleague|coworker|co-worker|classmate|employee|friend|wife|husband|partner|girlfriend|"
@@ -161,7 +153,6 @@ RULES: tuple[Rule, ...] = (
      r"\bfrom\s+(their|his|her)\s+(pcs?|computers?|laptops?|phones?|devices?|machines?)\b",
      "targets another person's device"),
 
-    # -- credential and data theft -------------------------------------
     ("CREDENTIAL_THEFT", PolicySeverity.PROHIBITED,
      r"\b(steal|dump|harvest|exfiltrate|siphon|scrape)\b.{0,30}\b(password|credential|token|api\s*key|private\s*key|hash|session|cookie)\b",
      "requests theft of credentials"),
@@ -172,7 +163,6 @@ RULES: tuple[Rule, ...] = (
      r"\b(steal|exfiltrate|leak|smuggle)\b.{0,30}\b(data|records?|database|customer|client|patient|files?)\b",
      "requests theft of data"),
 
-    # -- malware --------------------------------------------------------
     ("MALWARE", PolicySeverity.PROHIBITED,
      r"\b(write|create|build|make|generate|code|develop)\b.{0,30}"
      r"\b(malware|virus|ransomware|keylogger|trojan|botnet|rootkit|worm|spyware|backdoor|exploit\s+kit)\b",
@@ -181,7 +171,6 @@ RULES: tuple[Rule, ...] = (
      r"\bransomware\b|\bencrypt\b.{0,25}\bfiles\b.{0,25}\b(ransom|payment|bitcoin)\b",
      "requests ransomware"),
 
-    # -- sexual content -------------------------------------------------
     ("CSAM", PolicySeverity.PROHIBITED,
      r"\b(child|minor|kid|teen|underage|preteen|loli)\w*\b.{0,25}\b(porn|nude|naked|sexual|explicit|nsfw)\b|"
      r"\b(porn|nude|naked|sexual|explicit|nsfw)\b.{0,25}\b(child|minor|kid|teen|underage|preteen)\w*\b",
@@ -192,23 +181,16 @@ RULES: tuple[Rule, ...] = (
      r"\badult\s+(image|photo|picture|video|content|material)\w*",
      "requests sexual content, which this assistant does not retrieve"),
 
-    # -- harassment and abuse -------------------------------------------
     ("HARASSMENT", PolicySeverity.PROHIBITED,
      r"\bdoxx?(ing|ed)?\b|\bharass\w*|\bblackmail\w*|\bthreaten\b.{0,25}\b(him|her|them|someone)\b|"
      r"\bget\s+revenge\s+on\b|\bruin\s+(his|her|their)\s+(life|career|reputation)\b",
      "requests targeting or abusing a person"),
 
-    # -- fraud and impersonation ----------------------------------------
     ("FRAUD", PolicySeverity.PROHIBITED,
      r"\bimpersonat\w*|\bpretend\s+to\s+be\b.{0,25}\b(bank|police|admin|ceo|hr|support|government)\b|"
      r"\b(forge|fake)\b.{0,20}\b(invoice|receipt|id|identity|signature|document|passport)\b",
      "requests impersonation or forgery"),
 
-    # -- evasion of the controls themselves ------------------------------
-    # Destroying a log is only evasion when the log is somebody's record of
-    # *you*: "clear the old log files in my project folder" is housekeeping.
-    # So the verb-and-noun pair needs a second cue - an audit trail, a
-    # server, or a statement that the point is not being seen.
     ("EVASION", PolicySeverity.PROHIBITED,
      r"\b(delete|clear|wipe|erase|disable|scrub|remove|turn\s+off|switch\s+off)\b.{0,25}"
      r"\b(audit\s*(trail|logs?|logging)?|access\s+logs?|server\s+logs?|system\s+logs?|security\s+logs?|monitoring|"
@@ -223,13 +205,11 @@ RULES: tuple[Rule, ...] = (
      r"\b(antivirus|firewall|security\s+layer|asl|safety|guardrails?|content\s+filter)\b",
      "requests disabling the security controls"),
 
-    # -- weapons and serious physical harm --------------------------------
     ("PHYSICAL_HARM", PolicySeverity.PROHIBITED,
      r"\b(make|build|synthesi[sz]e|create)\b.{0,30}\b(bomb|explosive|nerve\s+agent|bioweapon|meth|fentanyl)\b|"
      r"\bhow\s+to\s+(kill|poison)\s+(someone|a\s+person|him|her|them)\b",
      "requests assistance with serious physical harm"),
 
-    # -- restricted: real reasons exist, but a human should look ----------
     ("SECURITY_TOOLING", PolicySeverity.RESTRICTED,
      r"\b(port\s*scan|nmap|metasploit|sqlmap|burp\s+suite|reverse\s+shell|payload\s+generator)\b",
      "requests offensive security tooling"),
@@ -241,15 +221,7 @@ RULES: tuple[Rule, ...] = (
      "requests bulk unsolicited messaging"),
 )
 
-# ------------------------------------------------------- compositional rules --
-# The rules above match phrasings. A paraphrase changes the phrasing and keeps
-# the structure, so these match the structure instead: an act of acquisition,
-# aimed at an asset, that belongs to somebody else - optionally with a statement
-# that the owner is not meant to know. Each part alone is ordinary ("open the
-# email", "my sister", "without asking"); the conjunction is what is not.
 
-#: a person other than the requester, in possessive form. The possessive matters:
-#: "the email from my sister" is hers to send; "my sister's email" is hers to keep.
 OTHER_PARTY = (
     r"(?:\b(?:my|our|the|a|this|that|his|her|their)\s+(?:old\s+|new\s+|ex-?)?)?"
     r"\b(?:manager|boss|roommate|flatmate|housemate|girlfriend|boyfriend|wife|husband|partner|ex|"
@@ -259,7 +231,6 @@ OTHER_PARTY = (
     r"someone\s+else|somebody\s+else|another\s+(?:person|user)|other\s+people)"
     r"(?:'s|s'|’s)"
 )
-#: things a person keeps private
 PRIVATE_ASSET = (
     r"\b(?:e-?mails?|inbox|accounts?|messages?|chats?|texts?|whatsapp|dms?|calls?|voicemail|"
     r"photos?|pictures?|files?|documents?|drive|cloud|laptop|phone|computer|pc|webcam|camera|"
@@ -271,7 +242,6 @@ ACQUIRE = (
     r"take|download|see|look\s+at|view|check|sneak|listen\s+to|guess|crack|figure\s+out|work\s+out|"
     r"obtain|retrieve|monitor|track|watch|record|hijack|steal)\b"
 )
-#: the requester says, in effect, that the owner has not agreed
 COVERT = (
     r"\bwithout\s+(?:(?:him|her|them|their|his|anyone|anybody|the\s+\w+|my\s+\w+)\s+)?"
     r"(?:knowing|knowledge|noticing|finding\s+out|asking|permission|consent|approval|authori[sz]ation|"
@@ -297,7 +267,6 @@ def _compositional_findings(text: str) -> list[PolicyFinding]:
     findings: list[PolicyFinding] = []
     covert = re.search(COVERT, text, re.I)
 
-    # verb ... other-party possessive ... asset   (in that order, within a clause)
     m = re.search(ACQUIRE + r".{0,40}?" + OTHER_PARTY + r"[^.;]{0,30}?" + PRIVATE_ASSET, text, re.I)
     if m:
         findings.append(PolicyFinding(
@@ -308,7 +277,6 @@ def _compositional_findings(text: str) -> list[PolicyFinding]:
                  + (" and says the owner is not to know" if covert else
                     "; no consent is stated, so a human should confirm"))))
 
-    # entry into a system, with a statement that it is not sanctioned
     e = re.search(ENTRY, text, re.I)
     if e and covert:
         findings.append(PolicyFinding(
@@ -316,7 +284,6 @@ def _compositional_findings(text: str) -> list[PolicyFinding]:
             matched=(e.group(0) + " … " + covert.group(0))[:80],
             why="requests entry to a system without the owner's sanction"))
 
-    # a credential that belongs to someone else
     c = re.search(r"\b(?:password|passcode|pin|login|credentials?)\b", text, re.I)
     if c and re.search(ACQUIRE, text, re.I) and (re.search(OTHER_PARTY, text, re.I) or covert):
         findings.append(PolicyFinding(
@@ -331,9 +298,6 @@ def _compositional_findings(text: str) -> list[PolicyFinding]:
     return findings
 
 
-#: Framings that make an otherwise-prohibited request plausibly legitimate.
-#: These only ever *downgrade* PROHIBITED to RESTRICTED — they never clear a
-#: request, because "it's for research" is also what a pretext sounds like.
 MITIGATIONS: tuple[tuple[str, str], ...] = (
     (r"\bhow\s+(do\s+i|to|can\s+i)\s+(protect|defend|prevent|secure|harden|mitigate|stop|detect)\b",
      "framed as defence rather than attack"),
@@ -348,13 +312,8 @@ MITIGATIONS: tuple[tuple[str, str], ...] = (
      "claims the target is the requester's own"),
 )
 
-#: Categories where no framing helps. Nothing downgrades these.
 ABSOLUTE_CATEGORIES = frozenset({"CSAM", "MALWARE", "PHYSICAL_HARM", "HARASSMENT"})
 
-#: When several rules fire at the same severity, report the most specific one.
-#: "write me a keylogger" matches both MALWARE and SURVEILLANCE; calling it
-#: surveillance would be true but would misname what was actually asked for, and
-#: the category is what the refusal message and the audit row carry.
 CATEGORY_PRIORITY: tuple[str, ...] = (
     "CSAM", "PHYSICAL_HARM", "MALWARE", "CREDENTIAL_THEFT", "DATA_THEFT",
     "UNAUTHORIZED_ACCESS", "SURVEILLANCE", "HARASSMENT", "FRAUD", "EVASION",
@@ -427,8 +386,6 @@ class PatternPurposeClassifier(PurposeClassifier):
             severity=severity,
             category=worst.category,
             risk=risk,
-            # High but never certain: a pattern match is strong evidence about
-            # wording, and wording is not the same thing as intent.
             confidence=0.88 if severity is PolicySeverity.PROHIBITED else 0.7,
             findings=findings,
             explanation=explanation,

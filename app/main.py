@@ -34,8 +34,6 @@ def _seed_database_if_missing() -> None:
     committed snapshot so the demo opens with a populated fingerprint library."""
     import shutil
 
-    # load_config, not get_config: this runs at import time, and get_config is
-    # cached -- reading it here froze the config before --live-model could set it.
     cfg = load_config()
     runtime = Path(cfg.database_path)
     seed = runtime.with_name("asl_state.seeded.db")
@@ -55,8 +53,6 @@ def create_app() -> FastAPI:
 
     @app.middleware("http")
     async def no_stale_pages(request, call_next):
-        # Pages and their assets revalidate on every load, so a demo always
-        # shows the code that is running rather than a cached older version.
         response = await call_next(request)
         path = request.url.path
         if path in ("/", "/classic", "/inspector") or path.startswith("/static/"):
@@ -87,7 +83,6 @@ def create_app() -> FastAPI:
 app = create_app()
 
 
-# --------------------------------------------------------------- CLI demo ----
 
 def _print_insight(insight: CallInsight, index: int) -> None:
     call = insight.invocation
@@ -166,7 +161,7 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["ASL_LLM_MODEL"] = args.model
         if args.base_url:
             os.environ["ASL_LLM_BASE_URL"] = args.base_url
-        get_config.cache_clear()  # pick up the overrides set above
+        get_config.cache_clear()
 
     if args.list:
         for scenario in SCENARIOS:

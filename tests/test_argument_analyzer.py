@@ -20,7 +20,6 @@ def codes(analysis) -> set[str]:
     return {f.code for f in analysis.findings}
 
 
-# ---------------------------------------------------------------- python ----
 
 def test_python_hello_world_is_low_risk() -> None:
     analysis = analyze_python("print('hello')")
@@ -72,7 +71,6 @@ def test_python_embedded_shell_command_is_analysed() -> None:
     assert any(code.startswith("NESTED_") for code in codes(analysis))
 
 
-# ----------------------------------------------------------------- shell ----
 
 def test_shell_listing_is_lower_risk_than_recursive_delete() -> None:
     benign = analyze_shell("ls -la /home/user")
@@ -109,7 +107,6 @@ def test_shell_never_executes_anything(tmp_path) -> None:
     assert marker.read_text(encoding="utf-8") == "intact"
 
 
-# ------------------------------------------------------------------- sql ----
 
 def test_sql_select_with_limit_is_modest_risk() -> None:
     analysis = analyze_sql("SELECT name FROM employees WHERE id = 3 LIMIT 1")
@@ -137,7 +134,6 @@ def test_sql_stacked_statements_and_os_access() -> None:
     assert Capability.EXECUTE in analysis.capabilities
 
 
-# ------------------------------------------------------------------ http ----
 
 def test_http_get_public_page_is_low_risk() -> None:
     analysis = analyze_http({"url": "https://example.com/article"}, "http.get")
@@ -161,7 +157,6 @@ def test_http_cloud_metadata_endpoint_is_credential_access() -> None:
     assert Capability.AUTHENTICATE in analysis.capabilities
 
 
-# ------------------------------------------------------------------ path ----
 
 def test_path_delete_contrast_is_the_headline_case() -> None:
     safe = analyze_path({"path": "temp.txt"}, "filesystem.delete")
@@ -183,7 +178,6 @@ def test_path_write_of_executable_unlocks_execute() -> None:
     assert Capability.EXECUTE in analysis.capabilities
 
 
-# ----------------------------------------------------------------- email ----
 
 def test_email_internal_recipient_is_low_risk() -> None:
     analysis = analyze_email(
@@ -204,7 +198,6 @@ def test_email_external_attachment_raises_risk() -> None:
     assert analysis.risk >= 75
 
 
-# ------------------------------------------------------------ dispatcher ----
 
 @pytest.fixture(scope="module")
 def dispatcher() -> tuple[ArgumentAnalyzer, ToolAnalyzer]:

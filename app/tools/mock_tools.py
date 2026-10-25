@@ -31,7 +31,6 @@ class ToolResult:
     output: Any = None
     error: str | None = None
     simulated: bool = True
-    #: opaque resource ids this call produced (feeds data-flow edges later)
     produced: list[str] = field(default_factory=list)
 
 
@@ -225,9 +224,8 @@ class MockToolbox:
         if not re.fullmatch(r"[\d\s+\-*/().]*", expression or ""):
             return ToolResult("calculator", False, error="unsupported characters in expression")
         try:
-            # Safe: the regex above admits only arithmetic literals and operators.
-            value = eval(expression, {"__builtins__": {}}, {})  # noqa: S307
-        except Exception as exc:  # pragma: no cover - defensive
+            value = eval(expression, {"__builtins__": {}}, {})
+        except Exception as exc:
             return ToolResult("calculator", False, error=str(exc))
         return ToolResult("calculator", True, output={"value": value})
 
@@ -243,4 +241,4 @@ class MockToolbox:
             return ToolResult(invocation.tool_name, False, error=f"bad arguments: {exc}")
 
     def reset(self) -> None:
-        self.__init__()  # noqa: PLC2801 - deliberate state reset for tests/demos
+        self.__init__()

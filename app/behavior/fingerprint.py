@@ -57,7 +57,6 @@ class FingerprintGenerator:
     def __init__(self, config: ASLConfig | None = None) -> None:
         self.config = config or get_config()
 
-    # -- generation -----------------------------------------------------
     def generate(self, snapshot: BehaviorGraphSnapshot) -> BehavioralFingerprint:
         invocations = [n for n in snapshot.nodes if n.kind is NodeKind.INVOCATION]
         invocations.sort(key=lambda n: (n.timestamp, n.node_id))
@@ -99,7 +98,6 @@ class FingerprintGenerator:
             max_scope=max_scope,
         )
 
-    # -- canonical pieces -----------------------------------------------
     @staticmethod
     def _caps_of(node) -> list[Capability]:
         if node.capability:
@@ -147,10 +145,8 @@ class FingerprintGenerator:
             src = _primary_capability(caps_by_node.get(edge.source, []))
             dst = _primary_capability(caps_by_node.get(edge.target, []))
             tokens.append((index[edge.source], f"{src}-{edge.edge_type.value}->{dst}"))
-        # order by position, then lexically, so the form is deterministic
         return [t for _, t in sorted(set(tokens), key=lambda p: (p[0], p[1]))]
 
-    # -- structural hash -------------------------------------------------
     @staticmethod
     def graph_hash(snapshot: BehaviorGraphSnapshot) -> str:
         """Weisfeiler-Lehman hash over semantic (tool-free) node labels."""
@@ -164,12 +160,9 @@ class FingerprintGenerator:
         if g.number_of_nodes() == 0:
             return hashlib.sha256(b"empty").hexdigest()[:32]
         with warnings.catch_warnings():
-            # NetworkX >= 3.5 warns that directed-graph hashes changed; we only
-            # ever compare hashes produced by this same version.
             warnings.simplefilter("ignore", UserWarning)
             return nx.weisfeiler_lehman_graph_hash(g, node_attr="label", edge_attr="et", iterations=3)
 
-    # -- similarity ------------------------------------------------------
     def similarity(self, a: BehavioralFingerprint, b: BehavioralFingerprint) -> float:
         """Graded similarity in [0, 1].
 
@@ -207,8 +200,6 @@ class FingerprintGenerator:
         total = sum(weight * value for weight, value in views)
         score = total / denominator if denominator else 0.0
 
-        # Structural agreement is corroborating evidence, but must never lift a
-        # weak match over the fast-path threshold on its own.
         if a.graph_hash == b.graph_hash:
             score = min(0.97, score + 0.02)
         return round(min(1.0, max(0.0, score)), 4)
@@ -292,8 +283,6 @@ def step_similarity(a: str, b: str) -> float:
     capability_overlap = _jaccard(caps_a, caps_b)
     resource_overlap = _resource_similarity(res_a, res_b)
     if capability_overlap == 0.0:
-        # Disjoint capabilities mean these are different actions; touching
-        # comparably ordinary resources must not make them look alike.
         return round(0.3 * resource_overlap, 4)
     return round(0.45 * capability_overlap + 0.55 * resource_overlap, 4)
 
@@ -313,7 +302,5 @@ def step_sequence_similarity(a: list[str], b: list[str]) -> float:
         return 1.0
     pairwise = sum(step_similarity(x, y) for x, y in zip(a, b))
     aligned = pairwise / max(len(a), len(b))
-    # Reward sequences that share the same multiset of steps even when the
-    # order shifted, without letting reordering count as identity.
     unordered = SequenceMatcher(None, sorted(a), sorted(b)).ratio()
     return round(max(aligned, 0.9 * unordered), 4)

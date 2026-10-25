@@ -32,7 +32,6 @@ from app.models.tool_call import EvaluationRequest, ToolInvocation
 
 SEED = 20260904
 
-# ---------------------------------------------------------------- vocabulary
 
 USERS_ROUTINE = [
     "alice_ops", "bob_dev", "carol_analyst", "dan_support", "erin_pm",
@@ -63,8 +62,6 @@ TABLES = ["orders", "customers", "products", "invoices", "tickets",
 COLLEAGUES = ["priya@company.com", "arjun@company.com", "meera@company.com",
               "rahul@company.com", "team@company.com", "support@company.com"]
 
-# ------------------------------------------------------------ step builders
-# Each builder returns (ToolInvocation, prompt fragment).
 
 Step = tuple[ToolInvocation, str]
 
@@ -212,7 +209,6 @@ ROUTINE_PROMPTS = [
 ]
 
 
-# ------------------------------------------------------------------ seeding
 
 def build_sessions(target: int, rng: random.Random) -> Iterator[dict]:
     """Yield session specs.
@@ -239,15 +235,6 @@ def build_sessions(target: int, rng: random.Random) -> Iterator[dict]:
     rng.shuffle(triples)
     routine_seqs += triples
 
-    # Hostile sessions are built from hostile steps only. Mixing routine steps
-    # into them was realistic but it poisoned the corpus: there are only ~26
-    # distinct single-call shapes, so a benign `filesystem.read` appearing inside
-    # an exfiltration session inherits that session's execution-chain risk and is
-    # recorded as a block against the shape every legitimate user shares. One per
-    # cent of blocked sightings was enough to pin confidence at 0.008 and put the
-    # fast path permanently out of reach. Keeping the populations disjoint is a
-    # fixture choice, and it is the one that lets routine behaviour become
-    # genuinely trusted.
     hostile_seqs: list[tuple[str, tuple[int, ...]]] = []
     hostile_seqs += [("h", (i,)) for i in hi]
     hostile_seqs += [("hh", c) for c in itertools.permutations(hi, 2)]
@@ -335,10 +322,6 @@ def seed(target: int = 4200, reset: bool = False, quiet: bool = False) -> dict:
         counts[spec["kind"]] += 1
         decisions[result.decision.value] = decisions.get(result.decision.value, 0) + 1
 
-        # The library is keyed on the CHAIN fingerprint -- the sequence -- because
-        # a single call collapses to one of only a few dozen capability shapes,
-        # while the sequence is what actually distinguishes one behaviour from
-        # another. A prefix is hostile as soon as any step in it is.
         flags = spec["hostile_steps"]
         for i, (call, proposed) in enumerate(zip(result.calls, spec["calls"])):
             fp = call.chain_fingerprint or call.fingerprint
@@ -351,8 +334,6 @@ def seed(target: int = 4200, reset: bool = False, quiet: bool = False) -> dict:
                 arguments=proposed.arguments,
                 decision=call.decision.value,
                 population="hostile" if any(flags[: i + 1]) else "routine",
-                # the exact prefix that produced this chain fingerprint, so the UI
-                # can replay the behaviour rather than guessing at a prompt
                 calls=[{"tool_name": c.tool_name, "arguments": c.arguments}
                        for c in spec["calls"][: i + 1]],
             )

@@ -26,52 +26,16 @@ from app.models.context import AnalysisContext
 from app.models.enums import Capability, Environment, Intent, ResourceClass, Scope
 from app.models.risk import RiskAssessment, RiskSignal
 
-#: how much the single worst signal is allowed to pull the fused score up
 DOMINANCE_FACTOR = 0.86
 
-#: Only signals that describe *what is actually being done* may set the
-#: dominance floor: the analysed arguments, the inferred purpose, and the
-#: chain the call sits in.
-#:
-#: Everything else is a **modulator**. Tool sensitivity and capability weight
-#: describe potential rather than action (`gmail.send` is powerful even when
-#: the mail is harmless); novelty, user trust, environment and anomaly describe
-#: circumstances. Modulators move the weighted mean, but letting them dominate
-#: would mean an unfamiliar user doing something harmless scores like an
-#: attack — which is precisely the false-positive mode this system must avoid.
 DOMINANT_SIGNALS = frozenset({"argument", "intent", "execution_chain", "request_policy"})
 
-#: Signals that are *supposed* to agree with each other. Disagreement among
-#: these means the pipeline genuinely does not understand the call, and a human
-#: should look.
-#:
-#: `tool` and `capability` are excluded on purpose. A powerful tool used
-#: harmlessly (`gmail.send` for one internal message) always shows a large gap
-#: between potential and action — that gap is the thing ASL exists to resolve,
-#: not evidence of confusion. Counting it would fire the confusion alarm on
-#: every ordinary use of any capable tool.
 DISAGREEMENT_SIGNALS = DOMINANT_SIGNALS | {"fingerprint"}
 
-#: Signals that describe the *behaviour*, for what a fingerprint remembers.
-#:
-#: `request_policy` is excluded, and the distinction is load-bearing. "HACK INTO
-#: SERVER" and "look up a dog picture" produce the *same* behavioural
-#: fingerprint, because both really are a web search. Recording the resulting
-#: block against that fingerprint would poison an innocent signature and make
-#: every later legitimate search inherit the punishment — a user could degrade
-#: everyone else's searches simply by asking prohibited things. The block was
-#: caused by the purpose, so it is charged to the user's trust, never to the
-#: behaviour's record.
 BEHAVIOURAL_SIGNALS = DOMINANT_SIGNALS - {"request_policy"}
 
-#: Signals intrinsic to a single call. `execution_chain` is deliberately
-#: absent: it describes the session, and charging it to a per-call
-#: fingerprint means a safe action inherits the risk of whatever it
-#: happened to be performed alongside.
 CALL_SIGNALS = BEHAVIOURAL_SIGNALS - {"execution_chain"}
 
-#: Invariants that are properties of the behaviour rather than of the request.
-#: Only these pin a fingerprint's stored risk high.
 BEHAVIOURAL_INVARIANTS = frozenset({
     "DESTRUCTIVE_PRODUCTION", "CREDENTIAL_ACCESS", "PRIVILEGE_ESCALATION",
     "REMOTE_CODE_EXECUTION", "EXFILTRATION_CHAIN",
@@ -104,26 +68,21 @@ class WeightedRiskFusion(RiskFusionStrategy):
                 invariants=["NO_SIGNALS"],
             )
 
-        # 1. confidence-weighted mean --------------------------------------
         numerator = sum(s.value * s.weight * max(s.confidence, 0.1) for s in signals)
         denominator = sum(s.weight * max(s.confidence, 0.1) for s in signals)
         weighted_mean = numerator / denominator if denominator else 0.0
 
-        # 2. dominance floor (action signals only) ---------------------------
         acting = [s for s in signals if s.name in DOMINANT_SIGNALS] or signals
         worst = max(acting, key=lambda s: s.value)
         score = max(weighted_mean, DOMINANCE_FACTOR * worst.value)
 
-        # 3. environment shaping -------------------------------------------
         multiplier = self._environment_multiplier(context)
         score *= multiplier
 
-        # 4. invariant floors ----------------------------------------------
         invariants = self.invariants(context)
         floor = max((self.config.invariant_floors[name] for name in invariants), default=0.0)
         score = max(score, floor)
 
-        # 5. bounded trust discount ----------------------------------------
         discount = self._trust_discount(context, invariants)
         score = max(floor, score - discount)
 
@@ -186,7 +145,6 @@ class WeightedRiskFusion(RiskFusionStrategy):
             risk = max(risk, 90.0)
         return round(min(100.0, max(0.0, risk)), 2)
 
-    # -- pieces -----------------------------------------------------------
     def invariants(self, context: AnalysisContext) -> list[str]:
         """Named conditions that pin a minimum risk regardless of history."""
         fired: list[str] = []
@@ -234,9 +192,6 @@ class WeightedRiskFusion(RiskFusionStrategy):
         if exfil_now or exfil_chain:
             fired.append("EXFILTRATION_CHAIN")
 
-        # A request for a prohibited purpose is an invariant in its own right:
-        # the tool call it produces may be trivially safe (a web search), so
-        # nothing else in this list would ever fire for it.
         if context.extras.get("policy_severity") == "PROHIBITED":
             fired.append("PROHIBITED_PURPOSE")
 
@@ -311,7 +266,7 @@ class AdaptiveRiskFusion(WeightedRiskFusion):
 
     name = "AdaptiveRiskFusion"
 
-    def fuse(self, signals: list[RiskSignal], context: AnalysisContext) -> RiskAssessment:  # pragma: no cover
+    def fuse(self, signals: list[RiskSignal], context: AnalysisContext) -> RiskAssessment:
         raise NotImplementedError(
             "AdaptiveRiskFusion is a planned comparator for the phase-15 evaluation"
         )
@@ -326,7 +281,7 @@ STRATEGIES: dict[str, type[RiskFusionStrategy]] = {
 def get_strategy(name: str | None = None, config: ASLConfig | None = None) -> RiskFusionStrategy:
     config = config or get_config()
     strategy = STRATEGIES.get(name or config.fusion_strategy, WeightedRiskFusion)
-    return strategy(config)  # type: ignore[call-arg]
+    return strategy(config)
 
 
 def build_signals(context: AnalysisContext, parts: dict[str, tuple[float, float, str]],
@@ -346,6 +301,5 @@ def build_signals(context: AnalysisContext, parts: dict[str, tuple[float, float,
     ]
 
 
-#: Intent risk is looked up by the engine when assembling signals.
 def intent_signal_value(intent: Intent, risk: float) -> float:
     return risk

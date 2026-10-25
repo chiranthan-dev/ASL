@@ -36,7 +36,6 @@ def decide(engine: ASLEngine, tool: str, arguments: dict, session: str) -> Decis
         tool_calls=[ToolInvocation(tool_name=tool, arguments=arguments)])).decision
 
 
-# ------------------------------------------------- the claim, stated exactly --
 
 PAYLOAD_BEARING = [
     ("shell.execute", {"command": "rm -rf /production --no-preserve-root"},
@@ -86,7 +85,6 @@ def test_a_disguised_name_does_not_soften_the_decision(engine: ASLEngine) -> Non
     assert disguised in (Decision.BLOCK, Decision.SANDBOX, Decision.CHALLENGE)
 
 
-# --------------------------------------------------------- the boundary ------
 
 def test_guessed_capabilities_stay_out_of_the_fingerprint(engine: ASLEngine) -> None:
     """An unregistered tool's *inferred* capabilities must not enter the key.
@@ -116,6 +114,4 @@ def test_operand_only_calls_are_a_known_limit(engine: ASLEngine) -> None:
     original = fingerprint_for(engine, "filesystem.delete", args, "b1")
     opaque = fingerprint_for(engine, "tool_7f3a", args, "b2")
     assert original and opaque
-    # Not asserted equal: the verb is absent from the arguments. What *is*
-    # required is that losing the verb never produces a permissive outcome.
     assert decide(engine, "tool_7f3a", args, "b3") is not Decision.ALLOW

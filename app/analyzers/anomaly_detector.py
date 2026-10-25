@@ -25,8 +25,8 @@ from app.trust.fingerprint_store import FingerprintStore
 
 @dataclass
 class AnomalySignal:
-    score: float                       # 0-100
-    confidence: float                  # 0-1
+    score: float
+    confidence: float
     anomalous: bool
     reasons: list[str] = field(default_factory=list)
     detail: dict = field(default_factory=dict)
@@ -45,9 +45,7 @@ class AnomalyDetector(ABC):
 class StatisticalAnomalyDetector(AnomalyDetector):
     """Frequency / transition / combination / timing / volume heuristics."""
 
-    #: a session firing calls faster than this is probably automated abuse
     BURST_CALLS_PER_MINUTE = 30
-    #: session call count past which volume alone becomes suspicious
     VOLUME_THRESHOLD = 12
 
     def __init__(self, store: FingerprintStore, threshold: float = 55.0) -> None:
@@ -69,8 +67,6 @@ class StatisticalAnomalyDetector(AnomalyDetector):
         score = ordered[0] + sum(min(6.0, v * 0.12) for v in ordered[1:])
         score = round(min(100.0, score), 2)
 
-        # Confidence grows with how much history the user has: with no baseline,
-        # "unusual" is not a meaningful claim.
         history_size = self.store.seen_key("user", user)
         confidence = round(min(0.9, 0.35 + 0.05 * history_size), 3)
 
@@ -82,7 +78,6 @@ class StatisticalAnomalyDetector(AnomalyDetector):
             detail={"components": components, "observations_for_user": history_size},
         )
 
-    # -- components -------------------------------------------------------
     def _combination(self, context: AnalysisContext, user: str, reasons: list[str]) -> float:
         key = "+".join(sorted(c.value for c in context.capability_set)) or "NONE"
         seen = self.store.seen_key("user_combination", f"{user}|{key}")
@@ -95,7 +90,6 @@ class StatisticalAnomalyDetector(AnomalyDetector):
             return 35.0
         return 10.0
 
-    #: a step that only reads cannot cause harm by following another step
     READ_ONLY_STEPS = frozenset({Capability.READ.value, "NONE"})
 
     def _transition(self, context: AnalysisContext, user: str, reasons: list[str]) -> float:
@@ -108,10 +102,6 @@ class StatisticalAnomalyDetector(AnomalyDetector):
             seen = self.store.seen_key("user_transition", key)
             self.store.observe_stat("user_transition", key, 1.0)
             if seen == 0 and self._benign_transition(transition):
-                # New, but into a read-only step by plain sequence: novelty
-                # without a means of harm. Noted, not flagged -- otherwise a
-                # user's first "calculate, then calculate again" was treated as
-                # anomalous, denied the fast path and docked their trust.
                 worst = max(worst, 30.0)
             elif seen == 0:
                 reasons.append(f"unseen action transition for this user: {transition}")
@@ -173,7 +163,7 @@ class MLAnomalyDetector(AnomalyDetector):
     def __init__(self, model_path: str | None = None) -> None:
         self.model_path = model_path
 
-    def score(self, context: AnalysisContext) -> AnomalySignal:  # pragma: no cover
+    def score(self, context: AnalysisContext) -> AnomalySignal:
         raise NotImplementedError(
             "learned anomaly detection is future work; use StatisticalAnomalyDetector"
         )

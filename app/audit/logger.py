@@ -106,9 +106,6 @@ class AuditLogger:
         of an otherwise ordinary behaviour.
         """
         behavioural = assessment.behavioural_risk if assessment else decision.risk_score
-        # The per-call fingerprint gets the call's own risk; the chain gets the
-        # sequence's. Using one number for both let a session's risk settle
-        # permanently onto every individual action it contained.
         per_call = assessment.call_risk if assessment else decision.risk_score
         self.store.record_observation(
             context.fingerprint,
@@ -121,8 +118,6 @@ class AuditLogger:
             path=decision.path.value,
             outcome=outcome,
         )
-        # Multi-step sessions also teach the chain-level signature, which is
-        # what lets a repeated *workflow* become cheap, not just a repeated call.
         if len(context.chain_fingerprint.steps) > 1:
             self.store.record_observation(
                 context.chain_fingerprint,
@@ -137,7 +132,6 @@ class AuditLogger:
             )
         self.trust.record(context.user.user_id, decision.decision, anomalous=anomalous)
 
-    # -- reads -------------------------------------------------------------
     def entries(self, limit: int = 50) -> list[dict[str, Any]]:
         return self.store.audit_entries(limit)
 
@@ -152,7 +146,6 @@ class AuditLogger:
         fast = sum(1 for e in entries if e["path"] == "FAST_PATH_ALLOW")
         return {
             "decisions": counts,
-            # the mix is computed from the last 500 rows; the total is the real one
             "total": self.store.audit_count(),
             "recent_window": len(entries),
             "fast_path_rate": round(fast / len(entries), 4),

@@ -16,7 +16,6 @@ from app.models.tool_call import (
     ToolAnalysis,
 )
 
-#: capabilities that structurally imply other capabilities
 IMPLICATIONS: dict[Capability, set[Capability]] = {
     Capability.DOWNLOAD: {Capability.NETWORK},
     Capability.UPLOAD: {Capability.NETWORK},
@@ -44,25 +43,16 @@ class CapabilityExtractor:
         from_tool = set(tool_analysis.capabilities)
         from_args = set(argument_analysis.capabilities) if argument_analysis else set()
 
-        # Capabilities the tool metadata never promised, discovered by reading
-        # the actual arguments.
         escalations = from_args - close_implications(from_tool)
 
         merged = close_implications(from_tool | from_args)
         weight = self.weigh(merged)
 
-        # What the call *demonstrably* does, as opposed to what we will be
-        # cautious about. For a registered tool the declaration is evidence. For
-        # an unregistered one it is a guess derived from the tool's name, and
-        # letting it into the fingerprint would make identity depend on the name
-        # by proxy -- the exact coupling the fingerprint exists to remove.
         if tool_analysis.known_tool:
             evidenced = merged
         elif from_args:
             evidenced = close_implications(from_args)
         else:
-            # Nothing to go on but the guess. Keep it, and let the low
-            # confidence already attached to an inferred profile speak.
             evidenced = merged
 
         confidence = self._confidence(tool_analysis, argument_analysis, escalations)
@@ -109,7 +99,5 @@ class CapabilityExtractor:
         if not argument_analysis.parse_ok:
             conf *= 0.85
         if escalations:
-            # We are confident *that* something extra is happening; the
-            # uncertainty this introduces belongs in the risk score, not here.
             conf = min(0.97, conf + 0.03)
         return round(min(1.0, max(0.0, conf)), 3)

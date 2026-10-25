@@ -36,7 +36,6 @@ class ToolInvocation(BaseModel):
     call_id: str = Field(default_factory=lambda: new_id("call"))
     tool_name: str
     arguments: dict[str, Any] = Field(default_factory=dict)
-    #: free-form agent rationale, used by the intent analyzer (phase 9)
     rationale: str | None = None
     timestamp: datetime = Field(default_factory=utcnow)
 
@@ -70,9 +69,7 @@ class ToolProfile(BaseModel):
     category: ToolCategory = ToolCategory.UNKNOWN
     sensitivity: int = Field(default=50, ge=0, le=100)
     capabilities: list[Capability] = Field(default_factory=list)
-    #: which argument analyzer to dispatch to (python/shell/sql/http/path/email/generic)
     analyzer: str = "generic"
-    #: which argument keys carry the payload the analyzer should inspect
     payload_keys: list[str] = Field(default_factory=list)
     reversible: bool = True
     requires_auth: bool = False
@@ -128,7 +125,6 @@ class ResourceDescriptor(BaseModel):
 
     resource_class: ResourceClass
     scope: Scope = Scope.SINGLE
-    #: normalized identifier (path, host, table, domain) - used for data-flow linking
     identifier: str | None = None
     sensitive: bool = False
 
@@ -168,11 +164,7 @@ class CapabilityAssessment(BaseModel):
     capabilities: list[Capability] = Field(default_factory=list)
     from_tool: list[Capability] = Field(default_factory=list)
     from_arguments: list[Capability] = Field(default_factory=list)
-    #: capabilities the arguments revealed but the tool metadata did not promise
     escalations: list[Capability] = Field(default_factory=list)
-    #: capabilities actually evidenced by this call -- argument-derived, plus
-    #: declared metadata only for tools the registry knows. Used to build the
-    #: behavioural fingerprint, so identity never depends on a name heuristic.
     evidenced: list[Capability] = Field(default_factory=list)
     weight: float = Field(default=0.0, ge=0, le=100)
     confidence: float = Field(default=0.5, ge=0.0, le=1.0)

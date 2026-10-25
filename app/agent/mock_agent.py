@@ -48,7 +48,6 @@ class AgentPlan:
     reasoning: str = ""
     matched_rules: list[str] = field(default_factory=list)
     source: str = "mock"
-    #: a direct reply, when a live model decides no tool is needed
     answer: str = ""
 
     def as_dict(self) -> dict[str, Any]:
@@ -63,7 +62,6 @@ class AgentPlan:
         }
 
 
-# ---------------------------------------------------------------- helpers ----
 
 def _first_path(text: str) -> str | None:
     for candidate in PATH_RE.findall(text):
@@ -89,8 +87,6 @@ def _quoted_or_rest(text: str, after: str) -> str:
     return parts[-1].strip(" .:'\"") if len(parts) > 1 else text.strip()
 
 
-# ------------------------------------------------------------------ rules ----
-#: (rule name, trigger pattern, builder) — first match per clause wins
 Rule = tuple[str, re.Pattern[str], Callable[[str], list[ToolInvocation]]]
 
 
@@ -208,9 +204,6 @@ def _rule_python(clause: str) -> list[ToolInvocation]:
 
 
 def _rule_shell(clause: str) -> list[ToolInvocation]:
-    # "Run the shell command: X" names the command after the colon. Splitting on
-    # the first trigger word instead handed the analyzer "the shell command: X",
-    # whose first token -- the binary it judges -- was the word "the".
     introduced = re.search(r"\b(?:command|shell|terminal)\s*:\s*(.+)$", clause, re.I)
     if introduced and not QUOTED_RE.search(clause):
         return [ToolInvocation(tool_name="shell.execute",
@@ -264,16 +257,11 @@ def _search_terms(clause: str) -> str:
     return (stripped or clause).strip(" .?!") or "general query"
 
 
-#: Requests a language model answers from its own knowledge. These are not
-#: searches and they are not tool calls. Routing them to `web_search` put 73% of
-#: ordinary prompts through a tool that was never asked for, which made the layer
-#: look like it was authorising something when nothing was being invoked at all.
 NO_TOOL_RE = re.compile(
     r"(?i)\b(translate|rephrase|reword|proofread|explain|describe|define|"
     r"brainstorm|draft|compose|write (me )?(a|an|some)\b|"
     r"what do you think|your opinion|tell me a|joke|poem|story)\b")
 
-#: Requests for capabilities this tool set simply does not have.
 UNSUPPORTED_RE = re.compile(
     r"(?i)\b(book|order|buy|purchase|reserve|ring|"
     r"remind me|set a reminder|calendar|meeting invite|print)\b")
@@ -286,18 +274,10 @@ RULES: list[Rule] = [
     ("email", re.compile(r"(?i)\b(email|e-mail|mail|send (a )?(message|note|mail)|write to|notify)\b"), _rule_email),
     ("database", re.compile(r"(?i)\b(database|sql|table|records?|rows?|query|select \*|db)\b"), _rule_sql),
     ("delete", re.compile(r"(?i)\b(delete|remove|erase|wipe|purge|clean ?up|rm)\b"), _rule_delete),
-    # An explicit shell/terminal mention outranks the downloader keywords it may
-    # contain: "run the shell command: curl ... | bash" is a shell call, not a
-    # download.
     ("shell", re.compile(r"(?i)\b(shell|bash|terminal|command line|sudo|chmod|rm -rf)\b"), _rule_shell),
-    # A bare hostname is a destination too: "upload it to pastebin.com" named a
-    # place to send data, but matched no scheme or keyword and was planned as a
-    # web search instead.
     ("upload", re.compile(r"(?i)\b(upload|post|publish|exfiltrate|send)\b.{0,30}\b(to|at)\b.{0,40}(https?://|api|endpoint|webhook|server|[a-z0-9-]+\.(com|net|org|io|ru|cn|tld|me|co))"), _rule_upload),
     ("download", re.compile(r"(?i)\b(download|fetch|curl|wget|retrieve)\b"), _rule_download),
     ("python", re.compile(r"(?i)\b(python|script|code)\b.{0,30}\b(run|execute|eval)\b|\b(run|execute)\b.{0,20}\b(python|script|code)\b"), _rule_python),
-    # A verb plus an actual path is a filesystem operation, whatever nouns the
-    # sentence happens to use.
     ("read_path", re.compile(r"(?i)\b(read|open|show|display|cat|print|summari[sz]e|analy[sz]e|check)\b[^/~]{0,40}(?:/|~/|[A-Za-z]:\\)"), _rule_read_file),
     ("write_file", re.compile(r"(?i)\b(write|save|create|append|store)\b.{0,30}\b(file|note|document|report|to disk)\b|\b(write|save)\b.{0,20}\bto\b"), _rule_write_file),
     ("read_file", re.compile(r"(?i)\b(read|open|show|display|cat|summari[sz]e|analy[sz]e)\b.{0,30}\b(file|document|note|report|log|config)\b"), _rule_read_file),
@@ -331,9 +311,6 @@ class MockAgent:
         matched: list[str] = []
         explanations: list[str] = []
 
-        # Compound shapes ("download X and run it") must be read whole: split
-        # into clauses first and "run it" loses its referent, producing a
-        # second, invented download.
         for name, pattern, builder in RULES[:2]:
             if pattern.search(text):
                 produced = builder(text)
@@ -357,8 +334,6 @@ class MockAgent:
                     break
 
         if not calls:
-            # Three distinct "no rule matched" cases. Collapsing them into a
-            # search misrepresents two of them.
             if UNSUPPORTED_RE.search(text):
                 matched.append("unsupported")
                 explanations.append(
@@ -383,8 +358,6 @@ class MockAgent:
     @staticmethod
     def _clauses(text: str) -> list[str]:
         clauses = [c.strip() for c in CLAUSE_SPLIT_RE.split(text) if c and c.strip()]
-        # Always consider the whole prompt too: some shapes only read correctly
-        # in full ("download X and run it" must not become two unrelated calls).
         return [text] if len(clauses) <= 1 else clauses
 
     @staticmethod
@@ -493,10 +466,6 @@ class LLMAgent:
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0,
-                    # Force a JSON body. Ollama and the OpenAI API both honour
-                    # this; a provider that ignores it still works because the
-                    # parser below also recovers JSON from fenced or prose-wrapped
-                    # replies.
                     "response_format": {"type": "json_object"},
                 },
                 timeout=self.timeout,
@@ -519,7 +488,7 @@ class LLMAgent:
                 source=f"llm:{self.model}",
                 answer="" if calls else answer,
             )
-        except Exception as exc:  # noqa: BLE001 - degrade to the mock, never crash
+        except Exception as exc:
             plan = self._fallback.plan(prompt)
             plan.reasoning += f" (LLM planner unavailable: {type(exc).__name__})"
             plan.source = "mock-fallback"
@@ -553,5 +522,5 @@ class LLMAgent:
             )
             response.raise_for_status()
             return str(response.json()["choices"][0]["message"]["content"] or "").strip()
-        except Exception:  # noqa: BLE001 - a missing reply must never break authorization
+        except Exception:
             return ""

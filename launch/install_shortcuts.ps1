@@ -1,8 +1,3 @@
-<#
-  Puts two shortcuts on the Desktop:
-    ASL Demo                 runs the demo locally
-    ASL Demo (public link)   runs it locally and opens a Cloudflare quick tunnel
-#>
 $here    = $PSScriptRoot
 $desktop = [Environment]::GetFolderPath('Desktop')
 $shell   = New-Object -ComObject WScript.Shell
@@ -13,7 +8,7 @@ function New-Shortcut($name, $extra, $style) {
     $lnk.TargetPath       = "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe"
     $lnk.Arguments        = "-NoProfile -ExecutionPolicy Bypass -File `"$here\start_demo.ps1`" $extra".Trim()
     $lnk.WorkingDirectory = Split-Path -Parent $here
-    $lnk.WindowStyle      = $style   # 1 normal, 7 minimised
+    $lnk.WindowStyle      = $style
     $lnk.Description      = "$name - Adaptive Security Layer"
     if (Test-Path $icon) { $lnk.IconLocation = "$icon,0" }
     $lnk.Save()

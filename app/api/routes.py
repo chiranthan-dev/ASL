@@ -161,9 +161,6 @@ def library(q: str = "", population: str = "", limit: int = 60,
                                 eligible=eligible)
 
 
-# Re-seeding replays thousands of sessions through the engine, which takes
-# minutes. It runs on a worker thread so the demo stays responsive, and the UI
-# polls the same path to learn when it has finished.
 _seed_state: dict[str, Any] = {"running": False, "summary": None, "error": None}
 
 
@@ -178,7 +175,7 @@ def start_seed(target: int = 2500) -> dict[str, Any]:
             _seed_state["summary"] = seed_library.seed(
                 target=max(200, min(target, 12000)), reset=False, quiet=True)
             _seed_state["error"] = None
-        except Exception as exc:  # surfaced to the UI rather than swallowed
+        except Exception as exc:
             _seed_state["error"] = f"{type(exc).__name__}: {exc}"
         finally:
             _seed_state["running"] = False

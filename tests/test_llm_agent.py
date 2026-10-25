@@ -16,7 +16,6 @@ import pytest
 from app.agent.mock_agent import LLMAgent, MockAgent, _extract_json
 
 
-# ------------------------------------------------------------ JSON recovery --
 
 @pytest.mark.parametrize("raw", [
     '{"reasoning": "r", "tool_calls": [{"tool_name": "web_search", "arguments": {"query": "x"}}]}',
@@ -33,7 +32,6 @@ def test_extract_json_raises_when_absent() -> None:
         _extract_json("no json here at all")
 
 
-# --------------------------------------------------------- planner contract --
 
 class _FakeResponse:
     def __init__(self, content: str) -> None:
@@ -70,9 +68,8 @@ def test_llm_plan_falls_back_when_server_unreachable(monkeypatch) -> None:
     monkeypatch.setattr(httpx, "post", boom)
     agent = LLMAgent(model="test-model")
     plan = agent.plan("delete the file scratch.tmp")
-    # The pipeline still gets a plan — the deterministic mock produced it.
     assert plan.source == "mock-fallback"
-    assert plan.tool_calls  # a plan was still produced
+    assert plan.tool_calls
     assert plan.tool_calls[0].tool_name == MockAgent().plan("delete the file scratch.tmp").tool_calls[0].tool_name
 
 
@@ -99,7 +96,6 @@ def test_llm_plan_keeps_a_direct_answer(monkeypatch) -> None:
     assert plan.answer == "Paris is the capital of France."
 
 
-# ------------------------------------------------------- reply composition --
 
 def test_engine_composes_reply_from_allowed_output(monkeypatch, engine) -> None:
     """The reply is written after authorization, from the real tool output."""
@@ -113,9 +109,9 @@ def test_engine_composes_reply_from_allowed_output(monkeypatch, engine) -> None:
         {"tool_name": "filesystem.read", "arguments": {"path": "/home/user/notes.txt"}}]})
 
     def fake_post(url, *a, json=None, **k):
-        if json.get("response_format"):            # the planning call
+        if json.get("response_format"):
             return _FakeResponse(plan_reply)
-        seen["outcomes"] = json["messages"][-1]["content"]   # the compose call
+        seen["outcomes"] = json["messages"][-1]["content"]
         return _FakeResponse("Your notes say the demo moved to Thursday.")
 
     monkeypatch.setattr(httpx, "post", fake_post)
@@ -125,7 +121,6 @@ def test_engine_composes_reply_from_allowed_output(monkeypatch, engine) -> None:
         environment=Environment.SANDBOX, session_id="c1"))
     assert r.planner == "llm:test-model"
     assert r.answer == "Your notes say the demo moved to Thursday."
-    # the model was shown the verdict and the actual file content
     assert "filesystem.read" in seen["outcomes"]
     assert "Thursday" in seen["outcomes"]
 

@@ -49,7 +49,6 @@ from evaluation.systems import INTERVENED, StaticRules
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
 FAMILIES = ["surface", "alias", "synonym", "indirection"]
 
-#: verdict severity, for "did the rewrite weaken the decision?"
 RANK = {Decision.ALLOW: 0, Decision.ALLOW_WITH_LOG: 1, Decision.CHALLENGE: 2,
         Decision.SANDBOX: 3, Decision.BLOCK: 4}
 
@@ -65,7 +64,6 @@ def _b64(s: str) -> str:
     return base64.b64encode(s.encode()).decode()
 
 
-# ------------------------------------------------------------------ surface --
 
 def surface(tool: str, a: dict[str, Any]) -> dict[str, Any] | None:
     if "command" in a:
@@ -96,7 +94,6 @@ def surface(tool: str, a: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-# -------------------------------------------------------------------- alias --
 
 def _alias_path(p: str) -> str | None:
     if p.startswith("/home/user/"):
@@ -133,7 +130,6 @@ def alias(tool: str, a: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-# ------------------------------------------------------------------ synonym --
 
 PARAPHRASE = {
     "HACK INTO SERVER": "get into the server without the admins knowing",
@@ -174,7 +170,6 @@ def synonym(tool: str, a: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
-# -------------------------------------------------------------- indirection --
 
 def indirection(tool: str, a: dict[str, Any]) -> dict[str, Any] | None:
     if "command" in a:
@@ -220,7 +215,6 @@ def rewrite(m: MaterialisedScenario, family: str) -> MaterialisedScenario | None
                                 m.environment, m.user_id, calls)
 
 
-# --------------------------------------------------------------- measurement --
 
 @dataclass
 class Row:
@@ -265,7 +259,6 @@ def run(target_dir: Path = RESULTS_DIR, label: str = "rewriting") -> dict[str, A
     material = materialise([s for s in build_corpus() if s.harmful], base)
     base.store.close()
 
-    # The unmodified run is the reference every family is compared against.
     ref_engine = _fresh_engine(config, str(work / "rw_reference.db"))
     ref = {m.scenario_id: _evaluate(ref_engine, m, "ref") for m in material}
     ref_engine.store.close()

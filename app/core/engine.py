@@ -118,7 +118,6 @@ class ASLEngine:
 
         self._histories: dict[str, SessionHistory] = {}
 
-    # -- public API --------------------------------------------------------
     def evaluate(
         self, request: EvaluationRequest, executor: Callable[[ToolInvocation], Any] | None = None,
     ) -> EvaluationResponse:
@@ -134,10 +133,6 @@ class ASLEngine:
         plan = self._plan(request, tracer)
         calls = request.tool_calls or plan.tool_calls
 
-        # The request gate runs once per request, not per call: it judges the
-        # *purpose*, and the purpose does not change between the tool calls that
-        # serve it. It runs before any of them, because a prohibited request
-        # should not be reachable no matter how innocuous its tool calls look.
         policy = self.request_policy.analyze(request.prompt, request.conversation)
         tracer.add(
             "request_policy",
@@ -155,12 +150,6 @@ class ASLEngine:
         decision = DecisionEngine.summarize([e.decision for e in evaluations])
         worst = max(evaluations, key=lambda e: e.risk_score, default=None)
 
-        # A prohibited request is refused even when it produced no tool call at
-        # all. Without this, "write me a keylogger" -- which the planner answers
-        # from knowledge rather than by invoking anything -- returned ALLOW at
-        # risk 0, because a decision was only ever derived from the calls. The
-        # gate judges the request; it must not depend on the request having
-        # reached for a tool.
         policy_refusal = policy is not None and policy.severity is PolicySeverity.PROHIBITED
         if policy_refusal:
             decision = Decision.BLOCK
@@ -226,7 +215,6 @@ class ASLEngine:
         self.tools.reset()
         self._histories.clear()
 
-    # -- stages ------------------------------------------------------------
     def _plan(self, request: EvaluationRequest, tracer: _Tracer) -> AgentPlan:
         if request.tool_calls:
             plan = AgentPlan(
@@ -279,12 +267,8 @@ class ASLEngine:
             ran = bool(run.get("ok"))
             outcome = {"tool": ev.tool_name, "verdict": ev.decision.value, "executed": ran}
             if ran:
-                # Only the output: a small model recites whatever it is shown, and
-                # risk scores are the UI's job, not the reply's.
                 outcome["output"] = run.get("output")
             else:
-                # A plain reason, never the scored explanation: the model repeats
-                # whatever it is given, and the numbers belong in the UI.
                 why = {
                     Decision.CHALLENGE: "held until the user confirms it",
                     Decision.SANDBOX: "kept in a sandbox, so it did not run for real",
@@ -307,22 +291,9 @@ class ASLEngine:
             request.session_id, SessionHistory(started_at=time.time())
         )
 
-        # --- stages 1-5: behavior pipeline ------------------------------
         insight = self.pipeline.process(call, request.session_id, request.user_id)
         self._trace_behavior_stages(insight, tracer)
 
-        # --- stage 6: fingerprint trust lookup --------------------------
-        # Authorization memory is keyed on what *this call* does, never on the
-        # session's running chain. Keying it on the chain looked appealing --
-        # it makes a repeated workflow cheap -- but it is wrong: the chain grows
-        # with every turn, so the same action repeated three times in one
-        # conversation produced three different keys and the layer forgot a
-        # behaviour it had seen 944 times. Familiarity has to attach to the act.
-        #
-        # The chain is not discarded. It is still recorded by the audit learner
-        # (workflow-level memory) and it is still what the execution-chain
-        # analyzer reads to catch a sequence of individually innocent steps.
-        # It contributes as a *signal*; it is not the identity of this call.
         match = self.store.find_best_match(insight.fingerprint, request.user_id)
         chain_match = (
             self.store.find_best_match(insight.chain_fingerprint, request.user_id)
@@ -351,10 +322,6 @@ class ASLEngine:
             context.extras["policy_severity"] = policy.severity.value
             context.extras["policy_category"] = policy.category
             context.extras["policy_explanation"] = policy.explanation
-        # Is this behaviour one the store has literally never held before? The
-        # query fingerprint is not written until the learning step at the end of
-        # the request, so an absent row here means genuinely first contact --
-        # which is the state the UI surfaces as "new fingerprint".
         first_seen = self.store.get(match.query_fingerprint_id) is None
         tracer.add(
             "trust_lookup",
@@ -372,9 +339,6 @@ class ASLEngine:
                 "previous_outcome": match.previous_outcome,
                 "known_fingerprints": self.store.count(),
                 "user": self.trust.describe(user_state),
-                # The session's running sequence, reported alongside but kept out
-                # of this call's identity. A novel *chain* of familiar acts is a
-                # reason to look harder, not a reason to forget the acts.
                 "chain_fingerprint": (chain_match.query_fingerprint_id
                                       if chain_match else None),
                 "chain_steps": len(insight.chain_fingerprint.steps),
@@ -388,7 +352,6 @@ class ASLEngine:
             call_id=call.call_id,
         )
 
-        # --- stage 7: anomaly detection (cheap, needed by the fast path) --
         anomaly = self.anomaly.score(context)
         context.extras["anomaly_flag"] = anomaly.anomalous
         context.extras["anomaly_detail"] = "; ".join(anomaly.reasons[:2])
@@ -403,7 +366,6 @@ class ASLEngine:
             call_id=call.call_id,
         )
 
-        # --- stage 8: fast path gate -------------------------------------
         verdict = self.fast_path.evaluate(context)
         tracer.add(
             "fast_path",
@@ -424,14 +386,6 @@ class ASLEngine:
                                     confidence=match.confidence,
                                     detail="validated behaviour, expensive analysis skipped")],
                 capabilities=sorted(context.capability_set, key=lambda c: c.value),
-                # Carry the existing history forward unchanged, on *both* keys.
-                # A fast-pathed run learns nothing new about the behaviour — it
-                # skipped the analysis — so recording a fresh number would let
-                # repetition quietly launder a behaviour's risk toward zero.
-                # `call_risk` must be set explicitly: left at its default it
-                # records 0.0 for every fast-pathed run, which is that same
-                # laundering, and it makes the fast path progressively easier to
-                # obtain the more it is used.
                 behavioural_risk=match.historical_risk,
                 call_risk=match.historical_risk,
                 explanation=verdict.reason,
@@ -475,10 +429,8 @@ class ASLEngine:
             call_id=call.call_id,
         )
 
-        # --- stage 16: execution (mock) -----------------------------------
         outcome = self._maybe_execute(call, decision.decision, tracer, executor)
 
-        # --- stage 17: audit + learning -----------------------------------
         latency = round((time.perf_counter() - call_started) * 1000, 3)
         record = self.audit.record(context, assessment, decision, latency,
                                    outcome=outcome, anomalous=anomaly.anomalous)
@@ -522,8 +474,6 @@ class ASLEngine:
             confidence=decision.confidence,
             fast_path=verdict.eligible,
             fingerprint=context.fingerprint.fingerprint_id,
-            # The session's running sequence. Distinct from `fingerprint`, which
-            # is this one call and is what the trust lookup is keyed on.
             chain_fingerprint=context.chain_fingerprint.fingerprint_id,
             fingerprint_novelty=match.novelty_score,
             capabilities=sorted(context.capability_set, key=lambda c: c.value),
@@ -535,7 +485,6 @@ class ASLEngine:
             risk_assessment=assessment,
         )
 
-    # -- helpers -----------------------------------------------------------
     def _trace_behavior_stages(self, insight: CallInsight, tracer: _Tracer) -> None:
         call_id = insight.invocation.call_id
         tool = insight.tool
@@ -729,8 +678,6 @@ class ASLEngine:
             "llm_confidence": (estimate.risk_contribution, estimate.confidence, estimate.explanation),
         }, self.config)
 
-        # Only emitted when it fired: a zero-valued signal on every benign
-        # request would drag the whole baseline down and flatter ordinary work.
         if policy is not None and policy.fired:
             signals.extend(build_signals(context, {
                 "request_policy": (policy.risk, policy.confidence, policy.explanation),
@@ -803,7 +750,6 @@ class ASLEngine:
         )
         return "not_executed"
 
-    # -- inspection --------------------------------------------------------
     def fingerprints(self, limit: int = 100) -> list[dict[str, Any]]:
         return [
             {

@@ -29,9 +29,6 @@ from app.models.enums import (
 )
 from app.models.tool_call import Finding, ResourceDescriptor
 
-# --------------------------------------------------------------------------
-# path classification
-# --------------------------------------------------------------------------
 
 SYSTEM_PATH_PATTERNS = (
     r"^/etc(/|$)", r"^/bin(/|$)", r"^/sbin(/|$)", r"^/usr/bin(/|$)", r"^/boot(/|$)",
@@ -71,9 +68,6 @@ def normalize_path(raw: str) -> str:
     p = (raw or "").strip().strip('"').strip("'")
     p = p.replace("\\", "/")
     p = re.sub(r"/{2,}", "/", p)
-    # Resolve `.` and `..` lexically, so `/srv/../production/` is classified as
-    # the place it names rather than the place it starts from. Traversal is
-    # still reported: classify_path checks the raw form for it separately.
     if p.startswith(("/", "~/")) and re.search(r"/\.\.?(/|$)", p):
         trailing = p.endswith("/")
         resolved = posixpath.normpath(p)
@@ -115,8 +109,6 @@ def classify_path(raw: str, recursive_hint: bool = False) -> tuple[ResourceDescr
 
     ext = "." + norm.rsplit(".", 1)[-1] if "." in norm.rsplit("/", 1)[-1] else ""
     if ext in EXECUTABLE_EXTENSIONS:
-        # Being an executable artifact outranks "some file in a home directory",
-        # but not "this is a credential store / system / production path".
         if resource_class in (ResourceClass.FILE, ResourceClass.USER_DATA):
             resource_class = ResourceClass.BINARY
         findings.append(Finding(
@@ -126,7 +118,6 @@ def classify_path(raw: str, recursive_hint: bool = False) -> tuple[ResourceDescr
     elif ext in CODE_EXTENSIONS and resource_class is ResourceClass.FILE:
         resource_class = ResourceClass.CODE
 
-    # scope
     scope = Scope.SINGLE
     if norm in ("/", "c:/", "~", "~/"):
         scope = Scope.UNBOUNDED
@@ -158,9 +149,6 @@ def classify_path(raw: str, recursive_hint: bool = False) -> tuple[ResourceDescr
     )
 
 
-# --------------------------------------------------------------------------
-# URL / host classification
-# --------------------------------------------------------------------------
 
 PRIVATE_HOST_RE = re.compile(
     r"^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|"
@@ -229,9 +217,6 @@ def classify_url(raw: str) -> tuple[ResourceDescriptor, list[Finding]]:
     )
 
 
-# --------------------------------------------------------------------------
-# secret / PII scanning
-# --------------------------------------------------------------------------
 
 SECRET_PATTERNS: tuple[tuple[str, str], ...] = (
     ("AWS_ACCESS_KEY", r"AKIA[0-9A-Z]{16}"),
@@ -256,9 +241,6 @@ def scan_secrets(text: str, analyzer: str = "argument") -> list[Finding]:
     return findings
 
 
-# --------------------------------------------------------------------------
-# aggregation
-# --------------------------------------------------------------------------
 
 def aggregate_risk(findings: Iterable[Finding], scope: Scope = Scope.SINGLE, base: float = 0.0) -> float:
     """Worst-finding floor plus a bounded premium for corroborating findings.

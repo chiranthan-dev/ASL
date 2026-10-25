@@ -26,7 +26,6 @@ class DecisionEngine:
     def __init__(self, config: ASLConfig | None = None) -> None:
         self.config = config or get_config()
 
-    # -- bands ------------------------------------------------------------
     def band(self, risk: float) -> Decision:
         cfg = self.config
         if risk < cfg.risk_allow_threshold:
@@ -39,7 +38,6 @@ class DecisionEngine:
             return Decision.SANDBOX
         return Decision.BLOCK
 
-    # -- decision ---------------------------------------------------------
     def decide(
         self,
         assessment: RiskAssessment,
@@ -49,7 +47,6 @@ class DecisionEngine:
         decision = self.band(assessment.risk_score)
         reasons = self.human_verification_reasons(assessment, context, decision)
 
-        # A confirmation requirement can only make a decision stricter.
         if reasons and decision in (Decision.ALLOW, Decision.ALLOW_WITH_LOG):
             decision = Decision.CHALLENGE
 
@@ -79,7 +76,6 @@ class DecisionEngine:
             ),
         )
 
-    # -- human verification -----------------------------------------------
     def human_verification_reasons(
         self, assessment: RiskAssessment, context: AnalysisContext, decision: Decision
     ) -> list[str]:
@@ -110,7 +106,6 @@ class DecisionEngine:
 
         return reasons
 
-    # -- explanation -------------------------------------------------------
     def explain(self, decision: Decision, assessment: RiskAssessment, reasons: list[str]) -> str:
         lines = [f"{decision.value} — risk {assessment.risk_score:.0f}, confidence {assessment.confidence:.2f}"]
         for signal in sorted(assessment.signals, key=lambda s: s.value * s.weight, reverse=True)[:5]:

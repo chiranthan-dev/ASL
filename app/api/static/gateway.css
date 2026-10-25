@@ -1,9 +1,3 @@
-/* ASL Gateway — dark command-center product UI.
- *
- * Loaded after styles.css: that file supplies the stage-detail renderer's
- * classes (used inside the light "checks" drawer); everything on the dark page
- * itself is prefixed gw- so the two never collide.
- */
 
 body.gw {
   --gw-bg: #0b0e13;
@@ -36,7 +30,6 @@ body.gw {
 }
 .gw code { font-family: var(--gw-mono); font-size: .9em; }
 
-/* ───────────────────────────── top bar ── */
 .gw-top {
   flex: 0 0 auto;
   display: flex; align-items: center; gap: 18px;
@@ -72,7 +65,6 @@ body.gw {
 .gw-ghost.dark { color: #14171a; border-color: #cfd2d7; }
 .gw-ghost.dark:hover { background: #f0f1f3; }
 
-/* ───────────────────────────── layout ── */
 .gw-main { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1.15fr 1fr .9fr; }
 .gw-col { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--gw-line); padding: 14px 16px; gap: 10px; }
 .gw-col:last-child { border-right: 0; }
@@ -80,12 +72,10 @@ body.gw {
 .gw-h { font: 600 11px var(--gw-sans); letter-spacing: .12em; text-transform: uppercase; color: var(--gw-soft); margin: 2px 0; }
 .gw-hint { color: var(--gw-soft); font-size: 12.5px; line-height: 1.5; margin: 6px 2px; }
 
-/* Chat-only: one centred column, like any chatbot. */
 .gw-main.mode-chat { grid-template-columns: 1fr; }
 .gw-main.mode-chat .gw-decisions, .gw-main.mode-chat .gw-console { display: none; }
 .gw-main.mode-chat .gw-chat { border-right: 0; width: 100%; max-width: 860px; margin: 0 auto; }
 
-/* ───────────────────────────── chat ── */
 .gw-chat { background: radial-gradient(900px 500px at 20% -10%, rgba(26, 140, 255, .07), transparent 60%); }
 #gwThread { flex: 1 1 auto; display: flex; flex-direction: column; gap: 14px; padding: 4px 4px 10px; }
 
@@ -124,7 +114,6 @@ body.gw {
 @keyframes gw-dot { 0%, 80%, 100% { opacity: .25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-3px); } }
 .gw-typing-label { color: var(--gw-soft); font-size: 12px; margin-left: 8px; }
 
-/* ASL tag under each reply */
 .gw-tag {
   display: inline-flex; align-items: center; gap: 7px; margin-top: 10px;
   font: 500 11.5px var(--gw-sans); color: var(--gw-mid); cursor: pointer;
@@ -134,7 +123,6 @@ body.gw {
 .gw-tag:hover { border-color: var(--c, #3b4a62); color: var(--gw-ink); }
 .gw-tag i { width: 7px; height: 7px; border-radius: 50%; background: var(--c, var(--gw-soft)); box-shadow: 0 0 6px var(--c, transparent); }
 
-/* inline approval */
 .gw-approve {
   margin-top: 10px; padding: 10px 12px; border-radius: 10px;
   background: rgba(245, 166, 35, .07); border: 1px solid rgba(245, 166, 35, .35);
@@ -171,7 +159,6 @@ body.gw {
 .gw-input button[disabled] { opacity: .45; cursor: default; }
 .gw-foot { font-size: 11px; color: var(--gw-soft); text-align: center; }
 
-/* ───────────────────────────── gate ── */
 .gw-gate {
   position: relative; flex: 0 0 auto; height: 150px; border-radius: 12px;
   border: 1px solid var(--gw-line); overflow: hidden;
@@ -218,7 +205,6 @@ body.gw {
   background: #fff; box-shadow: 0 0 12px #fff; pointer-events: none; opacity: 0;
 }
 
-/* ───────────────────────────── decision cards ── */
 .gw-cards { flex: 1 1 auto; display: flex; flex-direction: column; gap: 9px; padding-right: 2px; }
 .gw-card {
   --c: var(--gw-soft);
@@ -245,7 +231,6 @@ body.gw {
 .gw-card footer .fast { color: var(--gw-allow); font-weight: 600; }
 .gw-card .state { font-weight: 600; }
 
-/* ───────────────────────────── console ── */
 .gw-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .gw-stats div { background: var(--gw-panel); border: 1px solid var(--gw-line); border-radius: 10px; padding: 10px 12px; }
 .gw-stats b { display: block; font: 700 22px var(--gw-display); }
@@ -280,7 +265,6 @@ body.gw {
 .gw-known { font-size: 12px; color: var(--gw-soft); border-top: 1px solid var(--gw-line); padding-top: 9px; }
 .gw-known b { color: var(--gw-ink); font: 700 14px var(--gw-display); }
 
-/* ───────────────────────────── checks drawer (light sheet) ── */
 .gw-scrim { position: fixed; inset: 0; background: rgba(4, 7, 11, .55); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 40; }
 .gw-scrim.on { opacity: 1; pointer-events: auto; }
 .gw-drawer {
@@ -312,7 +296,6 @@ body.gw {
 .gw-stage.open .body { display: block; }
 .gw-vchip { font: 700 10.5px var(--gw-sans); letter-spacing: .05em; padding: 3px 8px; border-radius: 999px; text-transform: uppercase; }
 
-/* ───────────────────────────── small screens ── */
 @media (max-width: 1100px) {
   .gw-main { grid-template-columns: 1fr 1fr; }
   .gw-console { display: none; }

@@ -23,7 +23,6 @@ def observe(store: FingerprintStore, fp, decision=Decision.ALLOW, risk=8.0, user
     )
 
 
-# ---------------------------------------------------------------- storage ----
 
 def test_new_fingerprint_starts_untrusted(store: FingerprintStore) -> None:
     fp = fingerprint_for("image_search", {"query": "dogs"})
@@ -69,7 +68,6 @@ def test_observations_are_recorded(store: FingerprintStore) -> None:
     assert len(store.observations(fp.fingerprint_id)) == 2
 
 
-# ------------------------------------------------------------- similarity ----
 
 def test_unknown_behaviour_is_fully_novel(store: FingerprintStore) -> None:
     match = store.find_best_match(fingerprint_for("image_search", {"query": "dogs"}))
@@ -123,7 +121,6 @@ def test_reset_forgets_everything(store: FingerprintStore) -> None:
     assert store.count() == 0
 
 
-# ------------------------------------------------------------ user trust ----
 
 def test_trust_is_earned_slowly_and_lost_quickly(store: FingerprintStore, config) -> None:
     trust = TrustMemory(store, config)

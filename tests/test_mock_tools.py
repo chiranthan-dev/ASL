@@ -38,7 +38,7 @@ def test_shell_mock_never_spawns(toolbox: MockToolbox, tmp_path: Path) -> None:
 def test_filesystem_mock_is_virtual(toolbox: MockToolbox) -> None:
     assert run(toolbox, "filesystem.read", path="/etc/passwd").output == "root:x:0:0:"
     run(toolbox, "filesystem.delete", path="/etc/passwd")
-    assert Path("/etc/passwd").exists() or True  # the real file is untouched either way
+    assert Path("/etc/passwd").exists() or True
     assert "/etc/passwd" not in toolbox.fs.files
     assert "/etc/passwd" in toolbox.fs.deleted
 
