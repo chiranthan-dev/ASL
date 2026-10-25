@@ -309,3 +309,27 @@ def test_allowed_calls_reach_the_mock(engine: ASLEngine) -> None:
     before = len(engine.tools.call_log)
     run(engine, "Look up a nice dog picture.")
     assert len(engine.tools.call_log) == before + 1
+
+
+# ------------------------------------------------------- anomaly: novelty ----
+
+def test_novelty_alone_is_not_an_anomaly_when_the_next_step_only_reads() -> None:
+    from app.analyzers.anomaly_detector import StatisticalAnomalyDetector as D
+
+    assert D._benign_transition("READ-SEQUENCE->READ")
+    assert D._benign_transition("EMAIL-SEQUENCE->READ")
+    # a step that can act, or data flowing between steps, stays significant
+    assert not D._benign_transition("READ-SEQUENCE->UPLOAD")
+    assert not D._benign_transition("READ-DATA_FLOW->READ")
+    assert not D._benign_transition("DOWNLOAD-DATA_FLOW->EXECUTE")
+
+
+def test_a_repeated_calculation_is_not_flagged_as_unusual(engine: ASLEngine) -> None:
+    # enough history that the detector is allowed to flag at all
+    for i, prompt in enumerate(("Look up a nice dog picture.", "Summarize the file /home/user/notes.txt",
+                                "What is 45 * 3 + 10?")):
+        run(engine, prompt, user="carol", session=f"c_warm{i}")
+    run(engine, "What is 245 * 18?", user="carol", session="c_twice")
+    second = run(engine, "What is 12 * 12?", user="carol", session="c_twice")
+    anomaly = next(t for t in second.trace if t.stage == "anomaly")
+    assert anomaly.detail["anomalous"] is False, anomaly.detail

@@ -149,7 +149,7 @@ destructive runs and mail only reaches the demo outbox.
 ### Tests and evaluation
 
 ```bash
-.venv/Scripts/python -m pytest          # 279 tests, ~8 s
+.venv/Scripts/python -m pytest          # 284 tests, ~8 s
 ```
 
 ```bash

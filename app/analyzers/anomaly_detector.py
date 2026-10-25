@@ -95,6 +95,9 @@ class StatisticalAnomalyDetector(AnomalyDetector):
             return 35.0
         return 10.0
 
+    #: a step that only reads cannot cause harm by following another step
+    READ_ONLY_STEPS = frozenset({Capability.READ.value, "NONE"})
+
     def _transition(self, context: AnalysisContext, user: str, reasons: list[str]) -> float:
         transitions = context.chain_fingerprint.transitions
         if not transitions:
@@ -104,12 +107,26 @@ class StatisticalAnomalyDetector(AnomalyDetector):
             key = f"{user}|{transition}"
             seen = self.store.seen_key("user_transition", key)
             self.store.observe_stat("user_transition", key, 1.0)
-            if seen == 0:
+            if seen == 0 and self._benign_transition(transition):
+                # New, but into a read-only step by plain sequence: novelty
+                # without a means of harm. Noted, not flagged -- otherwise a
+                # user's first "calculate, then calculate again" was treated as
+                # anomalous, denied the fast path and docked their trust.
+                worst = max(worst, 30.0)
+            elif seen == 0:
                 reasons.append(f"unseen action transition for this user: {transition}")
                 worst = max(worst, 58.0)
             elif seen < 3:
                 worst = max(worst, 30.0)
         return worst
+
+    @classmethod
+    def _benign_transition(cls, transition: str) -> bool:
+        """`SRC-EDGE->DST`: true when DST only reads and the edge is a plain
+        sequence. A data-flow edge is never benign here -- what flows matters."""
+        left, _, target = transition.partition("->")
+        _, _, edge = left.rpartition("-")
+        return edge == "SEQUENCE" and target in cls.READ_ONLY_STEPS
 
     def _frequency(self, context: AnalysisContext, reasons: list[str]) -> float:
         started = context.history.started_at or time.time()
