@@ -40,7 +40,21 @@ class MockFilesystem:
 
     def __init__(self) -> None:
         self.files: dict[str, str] = {
-            "/home/user/notes.txt": "meeting notes",
+            "/home/user/notes.txt": (
+                "Team sync, Monday\n"
+                "- Demo for the review panel moves to Thursday 3pm.\n"
+                "- Kevin to finish the evaluation charts by Wednesday.\n"
+                "- Open question: run the live model on the laptop GPU or use the mock?\n"
+                "- Next sync: Friday 10am."
+            ),
+            "/home/user/atlas/notes.md": (
+                "# Project Atlas: notes\n\n"
+                "Goal: cut report generation time from 2 days to 2 hours.\n\n"
+                "Status: data pipeline done; dashboard 70% complete; testing starts next week.\n\n"
+                "Risks: the vendor API rate limit (100 requests/min) may slow the nightly sync.\n\n"
+                "Decisions: keep PostgreSQL, drop the Redis cache until load testing says we need it.\n\n"
+                "Owners: Priya (pipeline), Arjun (dashboard), Meera (testing)."
+            ),
             "/home/user/temp.txt": "scratch",
             "/production/database/users.db": "<binary>",
             "/etc/passwd": "root:x:0:0:",
@@ -106,7 +120,12 @@ class MockEmail:
             "sent_at": utcnow().isoformat(),
         }
         self.outbox.append(message)
-        return ToolResult("gmail.send", True, output={"queued": True, "message_index": len(self.outbox) - 1})
+        return ToolResult("gmail.send", True, output={
+            "status": "placed in the demo outbox; never delivered",
+            "to": message["to"],
+            "subject": subject,
+            "message_index": len(self.outbox) - 1,
+        })
 
 
 class MockPython:
@@ -150,7 +169,10 @@ class MockWeb:
     def search(self, tool_name: str, query: str = "", **_: Any) -> ToolResult:
         if tool_name == "image_search":
             return ToolResult(tool_name, True, output=self.PAGES["image"], produced=["https://images.example.com/dog1.jpg"])
-        return ToolResult(tool_name, True, output={"results": [{"title": f"result for {query}", "url": "https://example.com/1"}]})
+        return ToolResult(tool_name, True, output={
+            "results": [{"title": f"result for {query}", "url": "https://example.com/1"}],
+            "note": "simulated: live browsing is off in this demo, results are placeholders",
+        })
 
     def fetch(self, tool_name: str, url: str = "", **_: Any) -> ToolResult:
         return ToolResult(

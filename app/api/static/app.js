@@ -8,7 +8,7 @@
 const $ = (id) => document.getElementById(id);
 
 const STAGE_LABELS = {
-  agent: "LLM Agent (mock)",
+  agent: "LLM Agent (planner)",
   tool_analyzer: "Tool Analyzer",
   argument_analyzer: "Argument Analyzer",
   capability_extractor: "Capability Extractor",

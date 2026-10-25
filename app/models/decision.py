@@ -91,6 +91,11 @@ class EvaluationResponse(BaseModel):
     prompt: str = ""
     environment: Environment = Environment.SANDBOX
     agent_reasoning: str = ""
+    #: the agent's reply to the user, written by a live model after authorization;
+    #: empty when the planner is the mock (the UI then uses its template reply)
+    answer: str = ""
+    #: who planned: "mock", "mock-fallback", "caller" or "llm:<model>"
+    planner: str = ""
     calls: list[CallEvaluation] = Field(default_factory=list)
     trace: list[TraceEvent] = Field(default_factory=list)
     latency_ms: float = 0.0

@@ -409,8 +409,38 @@ function addAgentReply(result) {
   el.inner.appendChild(d);
 }
 
+/* A live model's own reply: escaped, paragraphs on blank lines. */
+function renderAnswer(text) {
+  return S.escapeHtml(text)
+    .split(/\n\s*\n/)
+    .map((p) => `<p>${p.replace(/\n/g, "<br>")}</p>`)
+    .join("");
+}
+
+/* One line under a model reply saying what the layer decided. */
+function authLine(result) {
+  const model = (result.planner || "").replace(/^llm:/, "");
+  const calls = result.calls || [];
+  if (!calls.length)
+    return `Answered directly by ${S.escapeHtml(model)}. No tool was needed, so there was nothing to authorize.`;
+  const names = S.escapeHtml([...new Set(calls.map((c) => c.tool_name))].join(", "));
+  const risk = Math.round(result.risk_score);
+  const by = `Planned by ${S.escapeHtml(model)}.`;
+  switch (result.decision) {
+    case "ALLOW": return `${by} ASL authorized <code>${names}</code> at risk ${risk}.`;
+    case "ALLOW_WITH_LOG": return `${by} ASL authorized <code>${names}</code> at risk ${risk} and logged it for audit.`;
+    case "CHALLENGE": return `${by} ASL held <code>${names}</code> for your confirmation (risk ${risk}).`;
+    case "SANDBOX": return `${by} ASL kept <code>${names}</code> in the sandbox (risk ${risk}).`;
+    case "BLOCK": return `${by} ASL blocked <code>${names}</code>: ${S.escapeHtml(shortReason(result))} (risk ${risk}).`;
+    default: return by;
+  }
+}
+
 function assistantText(result) {
   const calls = result.calls || [];
+  if (result.answer) {
+    return renderAnswer(result.answer) + `<p class="soft">${authLine(result)}</p>`;
+  }
   if (!calls.length) {
     const rules = agentRules(result);
     if (rules.includes("unsupported"))

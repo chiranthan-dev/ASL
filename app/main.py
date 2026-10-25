@@ -20,7 +20,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
-from app.core.config import get_config
+from app.core.config import get_config, load_config
 from app.core.pipeline import BehaviorPipeline, CallInsight
 from app.models.tool_call import ToolInvocation
 from demos.scenarios import SCENARIOS, Scenario
@@ -33,7 +33,9 @@ def _seed_database_if_missing() -> None:
     committed snapshot so the demo opens with a populated fingerprint library."""
     import shutil
 
-    cfg = get_config()
+    # load_config, not get_config: this runs at import time, and get_config is
+    # cached -- reading it here froze the config before --live-model could set it.
+    cfg = load_config()
     runtime = Path(cfg.database_path)
     seed = runtime.with_name("asl_state.seeded.db")
     if not runtime.exists() and seed.exists():
@@ -147,6 +149,7 @@ def main(argv: list[str] | None = None) -> int:
             os.environ["ASL_LLM_MODEL"] = args.model
         if args.base_url:
             os.environ["ASL_LLM_BASE_URL"] = args.base_url
+        get_config.cache_clear()  # pick up the overrides set above
 
     if args.list:
         for scenario in SCENARIOS:

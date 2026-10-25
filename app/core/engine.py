@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import time
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Callable
 
 from app.agent.mock_agent import AgentPlan, LLMAgent, MockAgent
 from app.analyzers.anomaly_detector import AnomalyDetector, StatisticalAnomalyDetector
@@ -119,7 +119,15 @@ class ASLEngine:
         self._histories: dict[str, SessionHistory] = {}
 
     # -- public API --------------------------------------------------------
-    def evaluate(self, request: EvaluationRequest) -> EvaluationResponse:
+    def evaluate(
+        self, request: EvaluationRequest, executor: Callable[[ToolInvocation], Any] | None = None,
+    ) -> EvaluationResponse:
+        """Authorize every call in the request.
+
+        `executor` runs an *allowed* call and returns a ToolResult. It defaults to the
+        built-in mock toolbox; the gateway passes its own sandboxed executor so allowed
+        calls act on a real (jailed) workspace and their output reaches the agent.
+        """
         started = time.perf_counter()
         tracer = _Tracer()
 
@@ -142,7 +150,7 @@ class ASLEngine:
 
         evaluations: list[CallEvaluation] = []
         for call in calls:
-            evaluations.append(self._evaluate_call(call, request, tracer, policy))
+            evaluations.append(self._evaluate_call(call, request, tracer, policy, executor))
 
         decision = DecisionEngine.summarize([e.decision for e in evaluations])
         worst = max(evaluations, key=lambda e: e.risk_score, default=None)
@@ -156,6 +164,8 @@ class ASLEngine:
         policy_refusal = policy is not None and policy.severity is PolicySeverity.PROHIBITED
         if policy_refusal:
             decision = Decision.BLOCK
+
+        answer = self._compose_answer(request, plan, policy, evaluations, tracer)
 
         latency = round((time.perf_counter() - started) * 1000, 3)
 
@@ -187,6 +197,8 @@ class ASLEngine:
             prompt=request.prompt,
             environment=request.environment,
             agent_reasoning=plan.reasoning,
+            answer=answer,
+            planner=plan.source,
             calls=evaluations,
             trace=tracer.events,
             latency_ms=latency,
@@ -225,18 +237,60 @@ class ASLEngine:
             )
         else:
             plan = self.agent.plan(request.prompt)
+        if plan.source.startswith("llm:"):
+            who = plan.source[4:]
+        elif plan.source == "mock-fallback":
+            who = "mock fallback: model unreachable"
+        elif plan.source == "caller":
+            who = "calls supplied by caller"
+        else:
+            who = "mock"
         tracer.add(
             "agent",
-            "0. LLM Agent (mock)",
+            f"0. LLM Agent ({who})",
             f"proposed {len(plan.tool_calls)} tool call(s)",
             detail=plan.as_dict(),
             highlights=[c.tool_name for c in plan.tool_calls],
         )
         return plan
 
+    def _compose_answer(
+        self, request: EvaluationRequest, plan: AgentPlan, policy: PolicyAssessment,
+        evaluations: list[CallEvaluation], tracer: _Tracer,
+    ) -> str:
+        """Let a live model write the reply, from what was actually authorized.
+
+        Only a live model composes; the mock's replies are templated in the UI.
+        Nothing is composed when the request gate flagged the purpose: the gate's
+        refusal stands on its own, and asking a model to write a reply to a
+        prohibited request would hand it exactly the request the gate refused.
+        """
+        if not plan.source.startswith("llm:") or policy.severity is not PolicySeverity.NONE:
+            return ""
+        if not evaluations:
+            return plan.answer
+        compose = getattr(self.agent, "compose", None)
+        if compose is None:
+            return ""
+        executed = {e.call_id: e.detail for e in tracer.events if e.stage == "execute"}
+        outcomes = []
+        for ev in evaluations:
+            run = executed.get(ev.call_id) or {}
+            ran = bool(run.get("ok"))
+            outcome = {"tool": ev.tool_name, "verdict": ev.decision.value, "executed": ran}
+            if ran:
+                # Only the output: a small model recites whatever it is shown, and
+                # risk scores are the UI's job, not the reply's.
+                outcome["output"] = run.get("output")
+            else:
+                outcome["why_not_run"] = (ev.explanation or run.get("error") or run.get("reason") or "")[:240]
+            outcomes.append(outcome)
+        return compose(request.prompt, outcomes)
+
     def _evaluate_call(
         self, call: ToolInvocation, request: EvaluationRequest, tracer: _Tracer,
         policy: PolicyAssessment | None = None,
+        executor: Callable[[ToolInvocation], Any] | None = None,
     ) -> CallEvaluation:
         call_started = time.perf_counter()
         history = self._histories.setdefault(
@@ -412,7 +466,7 @@ class ASLEngine:
         )
 
         # --- stage 16: execution (mock) -----------------------------------
-        outcome = self._maybe_execute(call, decision.decision, tracer)
+        outcome = self._maybe_execute(call, decision.decision, tracer, executor)
 
         # --- stage 17: audit + learning -----------------------------------
         latency = round((time.perf_counter() - call_started) * 1000, 3)
@@ -707,9 +761,12 @@ class ASLEngine:
         severity = 0.5 * context.capabilities.weight + 0.5 * context.arguments.risk
         return round(min(100.0, max(context.match.historical_risk, novelty * severity)), 2)
 
-    def _maybe_execute(self, call: ToolInvocation, decision: Decision, tracer: _Tracer) -> str | None:
+    def _maybe_execute(
+        self, call: ToolInvocation, decision: Decision, tracer: _Tracer,
+        executor: Callable[[ToolInvocation], Any] | None = None,
+    ) -> str | None:
         if decision in (Decision.ALLOW, Decision.ALLOW_WITH_LOG):
-            result = self.tools.execute(call)
+            result = (executor or self.tools.execute)(call)
             tracer.add(
                 "execute", "16. Tool Execution (mock)",
                 f"{call.tool_name} executed against mock state" if result.ok else f"failed: {result.error}",

@@ -48,12 +48,15 @@ class AgentPlan:
     reasoning: str = ""
     matched_rules: list[str] = field(default_factory=list)
     source: str = "mock"
+    #: a direct reply, when a live model decides no tool is needed
+    answer: str = ""
 
     def as_dict(self) -> dict[str, Any]:
         return {
             "reasoning": self.reasoning,
             "matched_rules": self.matched_rules,
             "source": self.source,
+            "answer": self.answer,
             "tool_calls": [
                 {"tool_name": c.tool_name, "arguments": c.arguments} for c in self.tool_calls
             ],
@@ -434,8 +437,30 @@ class LLMAgent:
         "gmail.send(to, subject, body, attachments), filesystem.read(path), filesystem.write(path, content), "
         "filesystem.delete(path, recursive), python.execute(code), shell.execute(command), "
         "database.select|insert|update|delete(query), http.get(url), http.post(url, json).\n"
+        "Use a tool when the request asks you to act on files, data, email or the web. If the "
+        "request needs no tool (a general-knowledge question, an explanation, a conversation), "
+        'return an empty "tool_calls" list and put your full reply to the user in "answer".\n'
         'Reply with ONLY a JSON object, no prose, no markdown fences: '
-        '{"reasoning": "...", "tool_calls": [{"tool_name": "...", "arguments": {...}}]}'
+        '{"reasoning": "...", "tool_calls": [{"tool_name": "...", "arguments": {...}}], "answer": "..."}'
+    )
+
+    COMPOSE_HINT = (
+        "You are an assistant replying to the user. You proposed some tool calls, and a security "
+        "layer (ASL) checked each one before it ran. Write your reply to the user in plain text: "
+        "one to four short paragraphs, no JSON, no headings.\n"
+        "How to read each outcome: ALLOW or ALLOW_WITH_LOG means the call ran and its output is "
+        "given. CHALLENGE means it did NOT run yet and needs the user's confirmation. SANDBOX or "
+        "BLOCK means it did NOT run.\n"
+        "Rules: base your reply on the outputs you were given and never invent file contents or "
+        "results you did not see. Speak to the user directly and naturally, and keep it brief. "
+        "For calls that ran, just give the user what they asked for: do not describe the tools, "
+        "the security layer, verdicts or risk scores, because the interface already shows them. "
+        "If asked to summarise, summarise in your own words; never paste tool output verbatim. "
+        "If a call did not run, do not pretend it did: say briefly what was stopped and why, and "
+        "suggest a safer alternative if there is one. Web search and web fetch in this demo are "
+        "offline simulations that return placeholders, so for questions about the world answer "
+        "from your own knowledge and mention that live browsing is off. Email goes to a demo "
+        "outbox and is never really delivered, so say it was placed in the outbox."
     )
 
     def __init__(
@@ -484,16 +509,49 @@ class LLMAgent:
                 for c in parsed.get("tool_calls", [])
                 if isinstance(c, dict) and c.get("tool_name")
             ]
-            if not calls:
-                raise ValueError("model proposed no tool calls")
+            answer = str(parsed.get("answer") or "").strip()
+            if not calls and not answer:
+                raise ValueError("model proposed no tool calls and no answer")
             return AgentPlan(
                 tool_calls=calls,
                 reasoning=str(parsed.get("reasoning", "")),
-                matched_rules=["llm"],
+                matched_rules=["llm"] if calls else ["llm_direct_answer"],
                 source=f"llm:{self.model}",
+                answer="" if calls else answer,
             )
         except Exception as exc:  # noqa: BLE001 - degrade to the mock, never crash
             plan = self._fallback.plan(prompt)
             plan.reasoning += f" (LLM planner unavailable: {type(exc).__name__})"
             plan.source = "mock-fallback"
             return plan
+
+    def compose(self, prompt: str, outcomes: list[dict[str, Any]]) -> str:
+        """Write the reply to the user from what ASL actually allowed.
+
+        Runs after authorization, so the model only ever sees the outputs of
+        calls that ran, plus the verdict and reason for those that did not. On
+        any failure it returns "" and the UI falls back to its template reply.
+        """
+        try:
+            import httpx
+
+            headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
+            body = json.dumps(outcomes, indent=1, default=str)[:6000]
+            response = httpx.post(
+                f"{self.base_url}/chat/completions",
+                headers=headers,
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": self.COMPOSE_HINT},
+                        {"role": "user", "content": f"User request: {prompt}\n\nTool calls and outcomes:\n{body}"},
+                    ],
+                    "temperature": 0.3,
+                    "max_tokens": 350,
+                },
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+            return str(response.json()["choices"][0]["message"]["content"] or "").strip()
+        except Exception:  # noqa: BLE001 - a missing reply must never break authorization
+            return ""
