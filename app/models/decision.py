@@ -33,6 +33,8 @@ class CallEvaluation(BaseModel):
 
     call_id: str
     tool_name: str
+    #: what the call asked for; kept so a held call can run after a human confirms
+    arguments: dict[str, Any] = Field(default_factory=dict)
     decision: Decision
     risk_score: float
     confidence: float

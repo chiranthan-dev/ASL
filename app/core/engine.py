@@ -283,7 +283,17 @@ class ASLEngine:
                 # risk scores are the UI's job, not the reply's.
                 outcome["output"] = run.get("output")
             else:
-                outcome["why_not_run"] = (ev.explanation or run.get("error") or run.get("reason") or "")[:240]
+                # A plain reason, never the scored explanation: the model repeats
+                # whatever it is given, and the numbers belong in the UI.
+                why = {
+                    Decision.CHALLENGE: "held until the user confirms it",
+                    Decision.SANDBOX: "kept in a sandbox, so it did not run for real",
+                    Decision.BLOCK: "blocked by the security layer",
+                }.get(ev.decision, "it did not run")
+                invariants = list(getattr(ev.risk_assessment, "invariants", None) or [])
+                if invariants:
+                    why += f" because {invariants[0].replace('_', ' ').lower()}"
+                outcome["why_not_run"] = why
             outcomes.append(outcome)
         return compose(request.prompt, outcomes)
 
@@ -506,6 +516,7 @@ class ASLEngine:
         return CallEvaluation(
             call_id=call.call_id,
             tool_name=call.tool_name,
+            arguments=dict(call.arguments),
             decision=decision.decision,
             risk_score=decision.risk_score,
             confidence=decision.confidence,

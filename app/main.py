@@ -19,6 +19,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.gateway import router as gateway_router
 from app.api.routes import router
 from app.core.config import get_config, load_config
 from app.core.pipeline import BehaviorPipeline, CallInsight
@@ -50,13 +51,29 @@ def create_app() -> FastAPI:
         version="0.5.0",
     )
     app.include_router(router)
+    app.include_router(gateway_router)
+
+    @app.middleware("http")
+    async def no_stale_pages(request, call_next):
+        # Pages and their assets revalidate on every load, so a demo always
+        # shows the code that is running rather than a cached older version.
+        response = await call_next(request)
+        path = request.url.path
+        if path in ("/", "/classic", "/inspector") or path.startswith("/static/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
     if STATIC_DIR.exists():
         app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
         @app.get("/", include_in_schema=False)
+        def gateway() -> FileResponse:
+            """The product: a chatbot with ASL's decisions and console beside it."""
+            return FileResponse(str(STATIC_DIR / "gateway.html"))
+
+        @app.get("/classic", include_in_schema=False)
         def chat() -> FileResponse:
-            """Chat is the front door: it shows the system doing its job."""
+            """The original research demo chat."""
             return FileResponse(str(STATIC_DIR / "chat.html"))
 
         @app.get("/inspector", include_in_schema=False)

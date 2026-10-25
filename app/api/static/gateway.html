@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ASL Gateway</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'><stop offset='0' stop-color='%2329d391'/><stop offset='1' stop-color='%231a8cff'/></linearGradient></defs><rect width='100' height='100' rx='24' fill='url(%23g)'/><text x='50' y='68' font-size='50' font-family='sans-serif' font-weight='700' fill='%23061018' text-anchor='middle'>A</text></svg>" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/styles.css?v=4" />
+  <link rel="stylesheet" href="/static/gateway.css?v=4" />
+</head>
+<body class="gw">
+
+<header class="gw-top">
+  <div class="gw-logo"><i></i><span>ASL Gateway</span></div>
+
+  <div class="gw-switch" role="tablist" aria-label="View">
+    <button type="button" role="tab" data-mode="chat">Chat</button>
+    <button type="button" role="tab" data-mode="asl">Chat + ASL</button>
+  </div>
+
+  <div class="gw-meta">
+    <span class="gw-model" title="The model planning tool calls">agent <b id="gwModel">…</b></span>
+    <label>env
+      <select id="gwEnv">
+        <option value="sandbox">sandbox</option>
+        <option value="development">development</option>
+        <option value="staging">staging</option>
+        <option value="production">production</option>
+      </select>
+    </label>
+    <label>user <input id="gwUser" value="demo_user" spellcheck="false" /></label>
+    <span class="gw-status"><i></i>protected</span>
+    <button type="button" class="gw-ghost" id="gwNew">New chat</button>
+  </div>
+</header>
+
+<main class="gw-main" id="gwMain">
+
+  <!-- ───────────── chat ───────────── -->
+  <section class="gw-col gw-chat" aria-label="Assistant">
+    <div class="gw-scroll" id="gwThread">
+      <div class="gw-empty" id="gwEmpty">
+        <div class="gw-orb"></div>
+        <h2>What can I help with?</h2>
+        <p>Ask anything. Whenever the assistant reaches for a tool, ASL checks the call before it runs.</p>
+        <div class="gw-suggest" id="gwSuggest"></div>
+      </div>
+    </div>
+    <form class="gw-input" id="gwForm" autocomplete="off">
+      <textarea id="gwText" rows="1" placeholder="Message the assistant…"></textarea>
+      <button type="submit" id="gwSend" aria-label="Send">
+        <svg viewBox="0 0 24 24" width="18" height="18"><path d="M4 12l15-7-6 15-2-6z" fill="currentColor"/></svg>
+      </button>
+    </form>
+    <div class="gw-foot">Tools here are demo tools: nothing destructive ever runs, and mail goes to a demo outbox.</div>
+  </section>
+
+  <!-- ───────────── live decisions ───────────── -->
+  <section class="gw-col gw-decisions" aria-label="Live decisions">
+    <h3 class="gw-h">Live decisions</h3>
+    <div class="gw-gate" id="gwGate">
+      <div class="gw-agent">Agent</div>
+      <div class="gw-wire"></div>
+      <div class="gw-shield" id="gwShield"><span>ASL</span></div>
+      <div class="gw-lanes">
+        <div class="gw-lane l-allow" data-lane="allow"><b id="laneAllow">0</b><span>Allowed</span></div>
+        <div class="gw-lane l-hold" data-lane="hold"><b id="laneHold">0</b><span>Needs you</span></div>
+        <div class="gw-lane l-block" data-lane="block"><b id="laneBlock">0</b><span>Blocked</span></div>
+      </div>
+    </div>
+    <div class="gw-scroll gw-cards" id="gwCards">
+      <p class="gw-hint" id="gwCardsHint">Each tool call appears here as ASL checks it. Click one to see every stage.</p>
+    </div>
+  </section>
+
+  <!-- ───────────── console ───────────── -->
+  <section class="gw-col gw-console" aria-label="Security console">
+    <h3 class="gw-h">Security console</h3>
+    <div class="gw-stats">
+      <div><b id="statChecked">0</b><small>calls checked</small></div>
+      <div class="s-block"><b id="statBlocked">0</b><small>blocked</small></div>
+      <div class="s-hold"><b id="statHeld">0</b><small>waiting for you</small></div>
+      <div class="s-fast"><b id="statFast">0%</b><small>fast path</small></div>
+    </div>
+
+    <div class="gw-trust">
+      <div><span>your trust</span><b id="trustVal">—</b></div>
+      <div class="gw-bar"><i id="trustBar"></i></div>
+    </div>
+
+    <h3 class="gw-h">Waiting for you</h3>
+    <div class="gw-queue" id="gwQueue"><p class="gw-hint">Nothing waiting.</p></div>
+
+    <h3 class="gw-h">Audit log</h3>
+    <div class="gw-scroll gw-audit" id="gwAudit"></div>
+
+    <div class="gw-known"><b id="statKnown">—</b> behaviours known to ASL</div>
+  </section>
+</main>
+
+<!-- ───────────── checks drawer ───────────── -->
+<div class="gw-scrim" id="gwScrim"></div>
+<aside class="gw-drawer" id="gwDrawer" aria-hidden="true" aria-label="ASL checks">
+  <div class="gw-drawer-head">
+    <div>
+      <h2 id="gwDrawerTitle">ASL checks</h2>
+      <p id="gwDrawerSub"></p>
+    </div>
+    <button type="button" class="gw-ghost dark" id="gwDrawerClose">Close</button>
+  </div>
+  <div class="gw-drawer-body" id="gwDrawerBody"></div>
+</aside>
+
+<script src="/static/stages.js?v=4"></script>
+<script src="/static/gateway.js?v=4"></script>
+</body>
+</html>

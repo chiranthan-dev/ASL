@@ -114,15 +114,19 @@ def test_reset_endpoint(client) -> None:
     assert client.get("/fingerprints").json()["count"] == 0
 
 
-def test_both_surfaces_are_served(client) -> None:
-    chat = client.get("/")
-    assert chat.status_code == 200 and "ASL" in chat.text
-    assert 'chat.js' in chat.text, "the front door is the chat surface"
+def test_all_surfaces_are_served(client) -> None:
+    gateway = client.get("/")
+    assert gateway.status_code == 200 and "ASL" in gateway.text
+    assert "gateway.js" in gateway.text, "the front door is the gateway product"
+
+    chat = client.get("/classic")
+    assert chat.status_code == 200 and "chat.js" in chat.text
 
     inspector = client.get("/inspector")
     assert inspector.status_code == 200 and "Inspector" in inspector.text
 
-    for asset in ("/static/chat.js", "/static/app.js", "/static/stages.js", "/static/styles.css"):
+    for asset in ("/static/gateway.js", "/static/gateway.css", "/static/chat.js",
+                  "/static/app.js", "/static/stages.js", "/static/styles.css"):
         assert client.get(asset).status_code == 200, f"{asset} is missing"
 
 

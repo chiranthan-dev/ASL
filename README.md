@@ -71,8 +71,10 @@ Then start the server:
 .venv/Scripts/python -m app.main
 ```
 
-Open **http://127.0.0.1:8000/** for the chat demo, or **/inspector** for the detailed
-dashboard. On macOS/Linux use `.venv/bin/python`.
+Open **http://127.0.0.1:8000/** for the ASL Gateway: a chat assistant with ASL's live
+decisions and security console beside it (switch to **Chat** for the assistant alone).
+**/inspector** is the detailed stage-by-stage dashboard and **/classic** the original
+research chat. On macOS/Linux use `.venv/bin/python`.
 
 Everything runs locally with no API key: the agent is a deterministic mock and every
 tool (filesystem, database, shell, mail, web) is an inert mock — nothing is ever
@@ -108,10 +110,46 @@ Override the model or endpoint:
 or via environment variables: `ASL_MOCK_LLM=false`, `ASL_LLM_MODEL`, `ASL_LLM_BASE_URL`,
 `ASL_LLM_API_KEY`.
 
+### One-click demo on a Windows laptop
+
+[`launch/`](launch) holds a launcher that starts Ollama (if installed), starts the ASL
+server with the live model, and opens the browser. Anything already running is reused.
+Create the two Desktop shortcuts once:
+
+```bash
+powershell -NoProfile -ExecutionPolicy Bypass -File launch/install_shortcuts.ps1
+```
+
+* **ASL Demo**: runs everything locally on http://localhost:8000.
+* **ASL Demo (public link)**: the same, plus a Cloudflare quick tunnel. The public
+  `https://….trycloudflare.com` link is printed and copied to the clipboard; closing
+  that window takes the link down.
+
+`launch/stop_demo.ps1` stops the server and the quick tunnel (Ollama keeps running).
+
+### Share a public link by hand (Cloudflare)
+
+A quick tunnel needs no Cloudflare account. With the server running:
+
+1. Install cloudflared once: `winget install --id Cloudflare.cloudflared`
+2. Open a new PowerShell window and run (the leading `&` is required in PowerShell):
+
+   ```powershell
+   & "C:\Program Files (x86)\cloudflared\cloudflared.exe" tunnel --url http://127.0.0.1:8000
+   ```
+
+3. Wait for the box that prints `https://<random-words>.trycloudflare.com` and share that
+   link. It can take up to a minute to start working.
+4. Press **Ctrl+C** in that window to take the link down. Each run gives a new link.
+
+Anyone with the link uses your laptop's model and demo database, so keep the window open
+only while you are presenting. The tools stay mock tools for them too: nothing
+destructive runs and mail only reaches the demo outbox.
+
 ### Tests and evaluation
 
 ```bash
-.venv/Scripts/python -m pytest          # 270 tests, ~6 s
+.venv/Scripts/python -m pytest          # 279 tests, ~8 s
 ```
 
 ```bash
