@@ -230,6 +230,7 @@ body.gw {
 @keyframes gw-drop { from { opacity: 0; transform: translateY(-12px) scale(.98); } }
 .gw-card.v-allow { --c: var(--gw-allow); } .gw-card.v-log { --c: var(--gw-log); }
 .gw-card.v-hold { --c: var(--gw-hold); } .gw-card.v-block { --c: var(--gw-block); } .gw-card.v-sandbox { --c: var(--gw-sandbox); }
+.gw-card.v-none { --c: #5b6577; } .gw-card.v-none .gw-verdict { color: var(--gw-mid); }
 .gw-card.v-hold.waiting { animation: gw-drop .45s cubic-bezier(.2, .8, .2, 1) both, gw-pulse 2s 1s ease-in-out infinite; }
 .gw-card header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 .gw-card header code { color: var(--gw-ink); font-size: 12.5px; }
@@ -271,9 +272,11 @@ body.gw {
 .gw-audit { flex: 1 1 auto; font: 11.5px/1.85 var(--gw-mono); color: var(--gw-mid); }
 .gw-audit div { display: flex; gap: 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: gw-rise .3s ease both; }
 .gw-audit time { color: var(--gw-soft); }
-.gw-audit em { font-style: normal; font-weight: 600; min-width: 46px; }
+.gw-audit em { font-style: normal; font-weight: 600; min-width: 52px; }
 .gw-audit .d-ALLOW { color: var(--gw-allow); } .gw-audit .d-ALLOW_WITH_LOG { color: var(--gw-log); }
 .gw-audit .d-CHALLENGE { color: var(--gw-hold); } .gw-audit .d-SANDBOX { color: var(--gw-sandbox); } .gw-audit .d-BLOCK { color: var(--gw-block); }
+.gw-audit .d-REFUSED { color: var(--gw-block); } .gw-audit .d-ANSWERED { color: var(--gw-soft); }
+.gw-audit .d-CONFIRMED { color: var(--gw-allow); } .gw-audit .d-DENIED { color: var(--gw-mid); }
 .gw-known { font-size: 12px; color: var(--gw-soft); border-top: 1px solid var(--gw-line); padding-top: 9px; }
 .gw-known b { color: var(--gw-ink); font: 700 14px var(--gw-display); }
 

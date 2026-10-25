@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import threading
 import time
+from collections import deque
+from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from app.models.enums import Decision, Environment
@@ -23,6 +25,18 @@ router = APIRouter(prefix="/api/gateway", tags=["gateway"])
 
 _lock = threading.Lock()
 _approvals: dict[str, dict[str, Any]] = {}
+# Decisions the per-call audit table never sees: a request answered without any
+# tool, a request refused before any tool, and a person confirming or denying a
+# held call. The console's log merges these with the audit rows.
+_activity: deque[dict[str, Any]] = deque(maxlen=200)
+
+
+def _note(user_id: str, session_id: str, decision: str, subject: str) -> None:
+    _activity.appendleft({
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "user_id": user_id, "session_id": session_id,
+        "decision": decision, "tool_name": subject, "path": "GATEWAY",
+    })
 
 _DECISION_TEXT = {
     Decision.CHALLENGE: "Not dangerous enough to refuse, not routine enough to pass unattended.",
@@ -71,6 +85,10 @@ def chat(body: ChatRequest) -> dict[str, Any]:
         session_id=body.session_id))
     created = []
     with _lock:
+        if not result.calls:
+            refused = result.decision is Decision.BLOCK
+            _note(body.user_id, body.session_id, "REFUSED" if refused else "ANSWERED",
+                  "request" if refused else "no tool needed")
         for call in result.calls:
             if call.decision is not Decision.CHALLENGE:
                 continue
@@ -102,6 +120,17 @@ def approvals() -> dict[str, Any]:
             "resolved": [a for a in items if a["status"] != "pending"][:20]}
 
 
+@router.get("/activity")
+def activity(limit: int = Query(14, ge=1, le=200)) -> dict[str, Any]:
+    """The console log: per-call audit rows plus the gateway's own decisions,
+    newest first."""
+    rows = list(_engine().audit.entries(limit))
+    with _lock:
+        rows += list(_activity)[:limit]
+    rows.sort(key=lambda r: str(r.get("timestamp", "")), reverse=True)
+    return {"entries": rows[:limit]}
+
+
 @router.post("/approvals/{approval_id}")
 def resolve(approval_id: str, body: Resolution) -> dict[str, Any]:
     with _lock:
@@ -112,6 +141,8 @@ def resolve(approval_id: str, body: Resolution) -> dict[str, Any]:
             raise HTTPException(status_code=409, detail=f"already {item['status']}")
         item["status"] = "confirmed" if body.approve else "denied"
         item["resolved_at"] = time.time()
+        _note(item["user_id"], item["session_id"],
+              "CONFIRMED" if body.approve else "DENIED", item["tool_name"])
 
     engine = _engine()
     if body.approve:

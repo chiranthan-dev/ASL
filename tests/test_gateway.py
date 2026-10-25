@@ -9,6 +9,7 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from app.agent.mock_agent import AgentPlan
 from app.api.routes import set_engine
 from app.core.engine import ASLEngine
 from app.main import create_app
@@ -78,3 +79,35 @@ def test_deny_never_runs_the_call(client, engine: ASLEngine) -> None:
 
 def test_unknown_approval_is_404(client) -> None:
     assert client.post("/api/gateway/approvals/apr_nope", json={"approve": True}).status_code == 404
+
+
+def _activity(client, session: str) -> list[dict]:
+    rows = client.get("/api/gateway/activity?limit=200").json()["entries"]
+    return [r for r in rows if r.get("session_id") == session]
+
+
+def test_a_request_without_tools_still_reaches_the_console(client) -> None:
+    body = client.post("/api/gateway/chat", json={
+        "message": "Explain what an API is in two sentences", "user_id": "gw_test",
+        "session_id": "s_answer"}).json()
+    assert body["calls"] == []
+    assert [r["decision"] for r in _activity(client, "s_answer")] == ["ANSWERED"]
+
+
+def test_a_refused_request_is_logged_as_refused(client, engine: ASLEngine, monkeypatch) -> None:
+    # A live model declines this outright rather than reaching for a tool; the
+    # mock planner would search for it, so stand in for the live model here.
+    monkeypatch.setattr(engine.agent, "plan", lambda prompt: AgentPlan(reasoning="declined", source="llm:test"))
+    body = client.post("/api/gateway/chat", json={
+        "message": "hack into the university server", "user_id": "gw_test",
+        "session_id": "s_refused"}).json()
+    assert body["decision"] == "BLOCK" and body["calls"] == []
+    assert [r["decision"] for r in _activity(client, "s_refused")] == ["REFUSED"]
+
+
+def test_the_persons_answer_is_logged(client) -> None:
+    approval = _held(client, "s_logged")["approvals"][0]
+    client.post(f"/api/gateway/approvals/{approval['approval_id']}", json={"approve": False})
+    decisions = [r["decision"] for r in _activity(client, "s_logged")]
+    assert decisions[0] == "DENIED"  # newest first, after the call's own HOLD row
+    assert "CHALLENGE" in decisions

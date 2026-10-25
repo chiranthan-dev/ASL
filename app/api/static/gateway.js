@@ -1,8 +1,8 @@
 /* ASL Gateway — chat with ASL's live decisions and console beside it.
  *
  * Every number on this page comes from the server: /api/gateway/chat for a
- * message, /api/gateway/approvals for held calls, /health, /audit and /api/user
- * for the console. The page animates what the engine decided; it never decides.
+ * message, /api/gateway/approvals for held calls, /health,
+ * /api/gateway/activity and /api/user for the console. The page animates what the engine decided; it never decides.
  */
 (function () {
   "use strict";
@@ -28,12 +28,13 @@
     BLOCK:          { lane: "block", cls: "v-block",   label: "Blocked",          tag: "blocked",            color: "var(--gw-block)" },
   };
   const verdict = (d) => VERDICT[d] || VERDICT.ALLOW;
+  const CARDS_HINT = "Every message appears here as ASL checks it. Click a card to see every stage.";
 
   const state = {
     session: newSession(),
     busy: false,
     results: {},
-    counts: { checked: 0, blocked: 0, fast: 0 },
+    counts: { checked: 0, blocked: 0, calls: 0, fast: 0 },
     lanes: { allow: 0, hold: 0, block: 0 },
   };
 
@@ -84,11 +85,11 @@
     if (state.busy) return;
     state.session = newSession();
     state.results = {};
-    state.counts = { checked: 0, blocked: 0, fast: 0 };
+    state.counts = { checked: 0, blocked: 0, calls: 0, fast: 0 };
     state.lanes = { allow: 0, hold: 0, block: 0 };
     $("gwThread").querySelectorAll(".gw-msg").forEach((m) => m.remove());
     $("gwEmpty").hidden = false;
-    $("gwCards").innerHTML = `<p class="gw-hint">Each tool call appears here as ASL checks it. Click one to see every stage.</p>`;
+    $("gwCards").innerHTML = `<p class="gw-hint">${CARDS_HINT}</p>`;
     $("laneAllow").textContent = "0";
     $("laneHold").textContent = "0";
     $("laneBlock").textContent = "0";
@@ -99,7 +100,8 @@
 
   function scrollThread() {
     const t = $("gwThread");
-    t.scrollTo({ top: t.scrollHeight, behavior: "smooth" });
+    requestAnimationFrame(() => t.scrollTo({ top: t.scrollHeight, behavior: "smooth" }));
+    setTimeout(() => { t.scrollTop = t.scrollHeight; }, 450);
   }
 
   function addMessage(role, html) {
@@ -342,31 +344,84 @@
     </article>`;
   }
 
+  function policyReason(result) {
+    const p = (result.trace || []).find((e) => e.stage === "request_policy");
+    const t = String((p && p.summary) || "").replace(/^[A-Z_]+:\s*/, "").replace(/\s*\(matched[^)]*\)\s*$/, "").trim();
+    if (!t) return "The purpose of the request is not permissible.";
+    return t.charAt(0).toUpperCase() + t.slice(1) + (/[.!?]$/.test(t) ? "" : ".");
+  }
+
+  // A message that reached no tool still went through the request gate:
+  // either the model answered on its own, or ASL refused the request outright.
+  function requestCardHtml(result, rid) {
+    const refused = purposeRefused(result);
+    const bar = (result.trace || []).filter((e) => !e.call_id && e.stage !== "session").map((e) => {
+      const cls = e.status === "critical" ? "crit" : e.status === "warning" ? "warn" : "on";
+      return `<span class="${cls}"></span>`;
+    }).join("");
+    const quote = esc(String(result.prompt || "").slice(0, 60));
+    return refused
+      ? `<article class="gw-card v-block" data-rid="${rid}">
+          <header><code>request refused</code><span class="gw-verdict">Blocked · ${Math.round(result.risk_score)}</span></header>
+          <p>${esc(policyReason(result))} ASL refused it before any tool was called.</p>
+          <div class="gw-stages">${bar}</div>
+          <footer><span class="state">nothing ran</span><span>open checks ▸</span></footer>
+        </article>`
+      : `<article class="gw-card v-none" data-rid="${rid}">
+          <header><code>no tool needed</code><span class="gw-verdict">Answered</span></header>
+          <p>“${quote}” was answered from the model's own knowledge, so there was no action to authorise. The request gate still checked it.</p>
+          <div class="gw-stages">${bar}</div>
+          <footer><span class="state">nothing to run</span><span>open checks ▸</span></footer>
+        </article>`;
+  }
+
+  function addCard(html, rid, callId) {
+    const wrap = document.createElement("div");
+    wrap.innerHTML = html;
+    const card = wrap.firstElementChild;
+    card.addEventListener("click", () => openChecks(rid, callId));
+    $("gwCards").prepend(card);
+  }
+
+  function hitLane(lane) {
+    state.lanes[lane] += 1;
+    const laneEl = $(`lane${lane[0].toUpperCase()}${lane.slice(1)}`);
+    laneEl.textContent = state.lanes[lane];
+    const box = laneEl.parentElement;
+    box.classList.add("hit");
+    setTimeout(() => box.classList.remove("hit"), 350);
+  }
+
   function showDecisions(result, rid) {
     const calls = result.calls || [];
     const hint = $("gwCards").querySelector(".gw-hint");
-    if (hint && calls.length) hint.remove();
+    if (hint) hint.remove();
+
+    if (!calls.length) {
+      const refused = purposeRefused(result);
+      state.counts.checked += 1;
+      if (refused) state.counts.blocked += 1;
+      const land = () => {
+        if (refused) hitLane("block");
+        addCard(requestCardHtml(result, rid), rid);
+        renderStats();
+      };
+      if (aslVisible()) flyToken(refused ? "block" : null, 0, land);
+      else land();
+      return;
+    }
 
     calls.forEach((call, i) => {
       const v = verdict(call.decision);
       state.counts.checked += 1;
+      state.counts.calls += 1;
       if (call.decision === "BLOCK") state.counts.blocked += 1;
       if (call.fast_path) state.counts.fast += 1;
 
       const delay = i * 450;
       const land = () => {
-        state.lanes[v.lane] += 1;
-        const laneEl = $(`lane${v.lane[0].toUpperCase()}${v.lane.slice(1)}`);
-        laneEl.textContent = state.lanes[v.lane];
-        const lane = laneEl.parentElement;
-        lane.classList.add("hit");
-        setTimeout(() => lane.classList.remove("hit"), 350);
-
-        const wrap = document.createElement("div");
-        wrap.innerHTML = cardHtml(result, call, rid);
-        const card = wrap.firstElementChild;
-        card.addEventListener("click", () => openChecks(rid, call.call_id));
-        $("gwCards").prepend(card);
+        hitLane(v.lane);
+        addCard(cardHtml(result, call, rid), rid, call.call_id);
         renderStats();
       };
       if (aslVisible()) flyToken(v.lane, delay, land);
@@ -375,21 +430,33 @@
     renderStats();
   }
 
-  // A glowing token travels Agent -> ASL shield -> its lane.
+  // A glowing token travels Agent -> ASL shield -> its lane. With no lane
+  // (a message that needed no tool) it is checked at the shield and fades there.
   function flyToken(lane, delay, done) {
     const gate = $("gwGate");
     const g = gate.getBoundingClientRect();
     const agent = gate.querySelector(".gw-agent").getBoundingClientRect();
     const shield = $("gwShield").getBoundingClientRect();
-    const target = gate.querySelector(`[data-lane="${lane}"]`).getBoundingClientRect();
     if (!g.width) { setTimeout(done, delay); return; }
 
     const at = (r, x) => `translate(${(x ?? r.left + r.width / 2) - g.left - 6}px, ${r.top + r.height / 2 - g.top - 6}px)`;
-    const color = { allow: "#29d391", hold: "#f5a623", block: "#ff5c6c" }[lane];
     const tok = document.createElement("i");
     tok.className = "gw-token";
     gate.appendChild(tok);
 
+    if (!lane) {
+      tok.animate([
+        { transform: at(agent, agent.right), opacity: 0, backgroundColor: "#ffffff", offset: 0 },
+        { transform: at(agent, agent.right), opacity: 1, backgroundColor: "#ffffff", offset: 0.1 },
+        { transform: at(shield), opacity: 1, backgroundColor: "#ffffff", offset: 0.6 },
+        { transform: at(shield) + " scale(2.4)", opacity: 0, backgroundColor: "#8a94a6", offset: 1 },
+      ], { duration: 1000, delay, easing: "cubic-bezier(.45,0,.2,1)", fill: "forwards" })
+        .onfinish = () => { tok.remove(); done(); };
+      return;
+    }
+
+    const target = gate.querySelector(`[data-lane="${lane}"]`).getBoundingClientRect();
+    const color = { allow: "#29d391", hold: "#f5a623", block: "#ff5c6c" }[lane];
     tok.animate([
       { transform: at(agent, agent.right), opacity: 0, backgroundColor: "#ffffff", offset: 0 },
       { transform: at(agent, agent.right), opacity: 1, backgroundColor: "#ffffff", offset: 0.08 },
@@ -424,7 +491,7 @@
     setNumber("statChecked", state.counts.checked);
     setNumber("statBlocked", state.counts.blocked);
     if (pendingCount !== undefined) setNumber("statHeld", pendingCount);
-    const pct = state.counts.checked ? Math.round((100 * state.counts.fast) / state.counts.checked) : 0;
+    const pct = state.counts.calls ? Math.round((100 * state.counts.fast) / state.counts.calls) : 0;
     setNumber("statFast", pct + "%");
   }
 
@@ -446,7 +513,8 @@
   }
 
   function renderAudit(entries) {
-    const short = { ALLOW: "ALLOW", ALLOW_WITH_LOG: "LOG", CHALLENGE: "HOLD", SANDBOX: "SANDBOX", BLOCK: "BLOCK" };
+    const short = { ALLOW: "ALLOW", ALLOW_WITH_LOG: "LOG", CHALLENGE: "HOLD", SANDBOX: "SANDBOX", BLOCK: "BLOCK",
+      REFUSED: "REFUSE", ANSWERED: "ANSWER", CONFIRMED: "YES", DENIED: "NO" };
     $("gwAudit").innerHTML = entries.map((e) => {
       const t = new Date(e.timestamp);
       const time = isNaN(t) ? "" : t.toLocaleTimeString([], { hour12: false });
@@ -467,7 +535,7 @@
     const [health, approvals, audit, trust] = await Promise.allSettled([
       getJson("/health"),
       getJson("/api/gateway/approvals"),
-      getJson("/audit?limit=14"),
+      getJson("/api/gateway/activity?limit=14"),
       getJson(`/api/user/${encodeURIComponent(user)}`),
     ]);
     if (health.status === "fulfilled") {
